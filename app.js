@@ -230,13 +230,13 @@ const lessons = [
       hu: {
         title: "Feature branchek", category: "BRANCHEK · 02",
         description: "A feature branch rövid életű ág egy jól körülhatárolt feladathoz. Elkülöníti a kísérletezést a stabil főágtól, és megkönnyíti a code review-t.\n\nA `git switch -c feature/search` létrehozza az ágat és rögtön át is vált rá. Kétlépéses forma: `git branch feature/search`, majd `git switch feature/search`.",
-        goal: "Legyen egy `feature` ág, amely legalább egy saját commitra mutat.",
+        goal: "Legyen egy `[[feature]]` ág, amely legalább egy saját commitra mutat.",
         hint: "Az ág létrehozása nem vált át rá. Két külön lépés: `git branch feature`, majd `git switch feature`.",
       },
       en: {
         title: "Feature branches", category: "BRANCHES · 02",
         description: "A feature branch is a short-lived branch for a focused task. It isolates experimentation from the stable main branch and makes code review easier.\n\n`git switch -c feature/search` creates the branch and switches to it. The two-step form is `git branch feature/search`, then `git switch feature/search`.",
-        goal: "Create a `feature` branch with at least one commit of its own.",
+        goal: "Create a `[[feature]]` branch with at least one commit of its own.",
         hint: "Creating a branch does not switch to it. These are two separate steps: `git branch feature`, then `git switch feature`.",
       },
     },
@@ -250,13 +250,13 @@ const lessons = [
       hu: {
         title: "Merge vagy rebase?", category: "TÖRTÉNET · 03",
         description: "Mindkettő integrál változásokat, de más történetet eredményez.\n\n• `git merge feature` megőrzi az ágak elágazását, és szükség esetén merge commitot készít. Jó választás megosztott ágakhoz és auditálható integrációhoz.\n• `git rebase main` új alapra játssza át a saját commitjaidat, így lineárisabb történetet ad. Saját, még nem megosztott feature ágon használható kényelmesen.\n\nNe rebase-eld át mások által használt, megosztott commitok történetét: átírja az azonosítókat.",
-        goal: "Egyesítsd a `feature` ágat a `main` ágba merge committal.",
+        goal: "Egyesítsd a `[[feature]]` ágat a `[[main]]` ágba merge committal.",
         hint: "Válts arra az ágra, amelyikbe be szeretnéd emelni a változásokat, aztán futtasd: `git merge feature`.",
       },
       en: {
         title: "Merge or rebase?", category: "HISTORY · 03",
         description: "Both integrate changes, but produce different histories.\n\n• `git merge feature` preserves the branch structure and creates a merge commit when needed. It is useful for shared branches and auditable integration.\n• `git rebase main` replays your commits onto a new base for a more linear history. It works well on your own, unpublished feature branch.\n\nAvoid rebasing commits that others already use: rewriting history changes their commit IDs.",
-        goal: "Merge the `feature` branch into `main` with a merge commit.",
+        goal: "Merge the `[[feature]]` branch into `[[main]]` with a merge commit.",
         hint: "Switch to the branch that should receive the changes, then run: `git merge feature`.",
       },
     },
@@ -277,13 +277,13 @@ const lessons = [
       hu: {
         title: "Rebase alapok", category: "TÖRTÉNET · 04",
         description: "A rebase az ág commitjait egy másik alapra helyezi át. A tartalom megmarad, de az új helyen új commitazonosítók keletkeznek.",
-        goal: "Helyezd át a `feature` ágat a `main` legfrissebb commitja után.",
+        goal: "Helyezd át a `[[feature]]` ágat a `[[main]]` legfrissebb commitja után.",
         hint: "Válts a `feature` ágra, majd futtasd: `git rebase main`. A main ág nem változik, a feature commitjai új alapot kapnak.",
       },
       en: {
         title: "Rebase fundamentals", category: "HISTORY · 04",
         description: "Rebase moves a branch's commits onto a new base. The changes remain, but Git creates new commit IDs at the new location.",
-        goal: "Move the `feature` branch so it starts after the latest commit on `main`.",
+        goal: "Move the `[[feature]]` branch so it starts after the latest commit on `[[main]]`.",
         hint: "Switch to `feature`, then run `git rebase main`. The main branch stays put while feature's commits get a new base.",
       },
     },
@@ -356,13 +356,13 @@ const lessons = [
       hu: {
         title: "Cherry-pick", category: "CÉLZOTT ÁTVÉTEL · 08",
         description: "A `git cherry-pick <commit>` egy kiválasztott commit változtatását új commitként alkalmazza az aktuális ágon. Hasznos például sürgős javítás átvitelére, ha nem akarod az egész feature ágat merge-elni.\n\nA célágon állj, majd add meg az átvenni kívánt commit azonosítóját. Az új commit más azonosítót kap, mert a szülője az aktuális HEAD lesz. Konfliktus esetén oldd fel, stage-eld a fájlokat, majd `git cherry-pick --continue`; megszakításhoz `git cherry-pick --abort`.",
-        goal: "Vedd át a `C2` javító commitot a `main` ágra `git cherry-pick C2` paranccsal.",
+        goal: "Vedd át a `[[C2]]` javító commitot a `[[main]]` ágra `git cherry-pick [[C2]]` paranccsal.",
         hint: "Cherry-pick előtt válts a célágra (`main`). Ez egyetlen commitot másol át; nem mozgatja a forráságat, és nem helyettesíti a rendszeres merge-et.",
       },
       en: {
         title: "Cherry-pick", category: "TARGETED INTEGRATION · 08",
         description: "`git cherry-pick <commit>` applies one selected commit as a new commit on your current branch. It is useful for bringing in a targeted fix without merging an entire feature branch.\n\nCheck out the destination branch, then provide the commit ID. The new commit gets a different ID because its parent is the current HEAD. If there is a conflict, resolve and stage the files, then run `git cherry-pick --continue`; abort with `git cherry-pick --abort`.",
-        goal: "Bring the `C2` fix onto `main` with `git cherry-pick C2`.",
+        goal: "Bring the `[[C2]]` fix onto `[[main]]` with `git cherry-pick [[C2]]`.",
         hint: "Switch to the destination (`main`) first. Cherry-pick copies one commit's changes; it does not move the source branch and is not a substitute for regular merges.",
       },
     },
@@ -455,8 +455,8 @@ function practiceCommit(title, enTitle, message, enMessage, minimum) {
       en: "Practice creating commits and reading history. Make small, focused steps on main, then inspect their order in the graph.",
     },
     goal: {
-      hu: `Készíts legalább ${minimum} új commitot a main ágon; az egyik üzenet legyen: „${message}”.`,
-      en: `Create at least ${minimum} new commits on main; use this message for one: "${enMessage}".`,
+      hu: `Készíts legalább ${minimum} új commitot a main ágon; az egyik üzenet legyen: „[[${message}]]”.`,
+      en: `Create at least ${minimum} new commits on main; use this message for one: "[[${enMessage}]]".`,
     },
     hint: {
       hu: `Használd a git commit -m "${message}" parancsot. A gráfon minden új commit külön csomópont.`,
@@ -477,7 +477,7 @@ function practiceBranch(title, enTitle, branch, enBranch) {
       hu: `Indíts külön fejlesztési ágat a \`${branch}\` néven. Válts át rá, és készíts rajta saját commitot; a main ág maradjon érintetlen.`,
       en: `Create an isolated development branch named \`${enBranch}\`. Switch to it and make a commit there; leave main untouched.`,
     },
-    goal: { hu: `Legyen egy \`${branch}\` ág, amely a main ágtól eltérő commitra mutat.`, en: `Create a \`${enBranch}\` branch that points to a commit different from main.` },
+    goal: { hu: `Legyen egy \`[[${branch}]]\` ág, amely a main ágtól eltérő commitra mutat.`, en: `Create a \`[[${enBranch}]]\` branch that points to a commit different from main.` },
     hint: { hu: `Két parancs: git branch ${branch}, majd git switch ${branch}. Az ág létrehozása nem jelent automatikus átváltást.`, en: `Two commands: git branch ${enBranch}, then git switch ${enBranch}. Creating a branch does not switch to it.` },
     initial: [{ id: "C0", parents: [], message: { hu: "Kiinduló állapot", en: "Starting point" }, lane: 0 }],
     branches: { main: "C0" },
@@ -497,7 +497,7 @@ function practiceMerge(title, enTitle, change, enChange) {
       hu: `A main és a feature ág egymástól függetlenül fejlődött. Őrizd meg mindkét commitot, és egyesítsd a feature ágat a mainbe.`,
       en: "Main and feature have progressed independently. Preserve both commits and merge feature into main.",
     },
-    goal: { hu: `Egyesítsd a feature ágat a mainbe; a merge commit üzenete említse: „${change}”.`, en: `Merge feature into main; include "${enChange}" in the merge commit message.` },
+    goal: { hu: `Egyesítsd a feature ágat a mainbe; a merge commit üzenete említse: „[[${change}]]”.`, en: `Merge feature into main; include "[[${enChange}]]" in the merge commit message.` },
     hint: { hu: "Állj a main ágra, majd futtasd: git merge feature. Az eredmény két szülővel rendelkező commit.", en: "Check out main, then run: git merge feature. The result is a commit with two parents." },
     initial: [
       { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
@@ -521,7 +521,7 @@ function practiceRebase(title, enTitle, change, enChange) {
       hu: "A main ág azóta előrelépett. Játszd át a feature saját commitját a main aktuális csúcsa után, és figyeld meg a commit gráfon az új történetet.",
       en: "Main has moved ahead. Replay the feature commit on top of the latest main commit and inspect the rewritten history in the graph.",
     },
-    goal: { hu: "Rebase-eld a feature ágat a main ágra.", en: "Rebase feature onto main." },
+    goal: { hu: "Rebase-eld a `[[feature]]` ágat a `[[main]]` ágra.", en: "Rebase `[[feature]]` onto `[[main]]`." },
     hint: { hu: "A feature ágon állva futtasd: git rebase main. Ez a még nem megosztott feature commit új azonosítóját hozza létre.", en: "On feature, run: git rebase main. This creates a new ID for the unpublished feature commit." },
     initial: [
       { id: "C0", parents: [], message: { hu: "Közös alap", en: "Common base" }, lane: 0 },
@@ -545,7 +545,7 @@ function practiceCherryPick(title, enTitle, fix, enFix) {
       hu: "Egy másik ágon elkészült egy önálló javítás. Vedd át kizárólag ezt a commitot a main ágra a teljes ág merge-elése nélkül.",
       en: "A focused fix is ready on another branch. Bring only that commit onto main without merging the entire branch.",
     },
-    goal: { hu: `Válts main ágra, és cherry-pickeld a C2 commitot („${fix}”).`, en: `Switch to main and cherry-pick commit C2 ("${enFix}").` },
+    goal: { hu: `Válts a \`[[main]]\` ágra, és cherry-pickeld a \`[[C2]]\` commitot („[[${fix}]]”).`, en: `Switch to \`[[main]]\` and cherry-pick commit \`[[C2]]\` ("[[${enFix}]]").` },
     hint: { hu: "A célágon állva használd: git cherry-pick C2. Az új commit a main HEAD-et kapja szülőként.", en: "On the destination branch, run: git cherry-pick C2. The new commit has main's HEAD as its parent." },
     initial: [
       { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
@@ -585,8 +585,8 @@ lessons.unshift(
       en: "Git records a name and email address as the author of each commit. These can be configured globally (`--global`) or just for the current repository.\n\nSet a global name and email. The sample address uses the reserved `.test` domain and is not a real mailbox.",
     },
     goal: {
-      hu: 'Állítsd be: `git config --global user.name "Learner Example"` és `git config --global user.email "learner@example.test"`.',
-      en: 'Set `git config --global user.name "Learner Example"` and `git config --global user.email "learner@example.test"`.',
+      hu: 'Állítsd be: `git config --global user.name "[[Learner Example]]"` és `git config --global user.email "[[learner@example.test]]"`.',
+      en: 'Set `git config --global user.name "[[Learner Example]]"` and `git config --global user.email "[[learner@example.test]]"`.',
     },
     hint: {
       hu: 'Ellenőrizd az értékeket a `git config --global --list` vagy a `git config --global --get user.email` paranccsal. A szimulátorban ezek próbaadatok.',
@@ -603,8 +603,8 @@ lessons.unshift(
       en: "Repository-specific settings live in `.git/config` and can override global values. `--local` limits a change to the current repository.\n\nSet `main` as the default branch name for new repositories, and disable automatic pull rebasing for this repository.",
     },
     goal: {
-      hu: "Állítsd be lokálisan az `init.defaultBranch` értékét `main`-re és a `pull.rebase` értékét `false`-ra.",
-      en: "Set local `init.defaultBranch` to `main` and `pull.rebase` to `false`.",
+      hu: "Állítsd be lokálisan az `init.defaultBranch` értékét `[[main]]`-re és a `pull.rebase` értékét `[[false]]`-ra.",
+      en: "Set local `init.defaultBranch` to `[[main]]` and `pull.rebase` to `[[false]]`.",
     },
     hint: {
       hu: "Használd a `git config --local init.defaultBranch main` és `git config --local pull.rebase false` parancsokat. A `git config --list` megmutatja a beállított értékeket.",
@@ -621,8 +621,8 @@ lessons.unshift(
       en: "A remote is a named connection to another repository. `origin` is the conventional default name, usually created automatically when you clone.\n\nAdd `origin` with the practice URL, list remotes, then try changing its URL with `git remote set-url`.",
     },
     goal: {
-      hu: "Az `origin` URL-je legyen `https://github.com/example/git-practice.git`.",
-      en: "Set the `origin` URL to `https://github.com/example/git-practice.git`.",
+      hu: "Az `[[origin]]` URL-je legyen `[[https://github.com/example/git-practice.git]]`.",
+      en: "Set the `[[origin]]` URL to `[[https://github.com/example/git-practice.git]]`.",
     },
     hint: {
       hu: "Add hozzá: `git remote add origin https://github.com/example/git-practice.git`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
@@ -1445,6 +1445,41 @@ function render() {
   renderLessons();
 }
 
+function appendGoalParameter(parent, value) {
+  const parameter = document.createElement("mark");
+  parameter.className = "goal-parameter";
+  parameter.textContent = value;
+  parent.append(parameter);
+}
+
+function appendGoalCode(parent, value) {
+  const code = document.createElement("code");
+  const parameterPattern = /\[\[([^\]]+)\]\]/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = parameterPattern.exec(value)) !== null) {
+    code.append(document.createTextNode(value.slice(lastIndex, match.index)));
+    appendGoalParameter(code, match[1]);
+    lastIndex = parameterPattern.lastIndex;
+  }
+  code.append(document.createTextNode(value.slice(lastIndex)));
+  parent.append(code);
+}
+
+function renderGoal(element, text) {
+  const tokenPattern = /\[\[([^\]]+)\]\]|\x60([^\x60]+)\x60/g;
+  let lastIndex = 0;
+  let match;
+  element.replaceChildren();
+  while ((match = tokenPattern.exec(text)) !== null) {
+    element.append(document.createTextNode(text.slice(lastIndex, match.index)));
+    if (match[1] !== undefined) appendGoalParameter(element, match[1]);
+    else appendGoalCode(element, match[2]);
+    lastIndex = tokenPattern.lastIndex;
+  }
+  element.append(document.createTextNode(text.slice(lastIndex)));
+}
+
 function renderLessons() {
   lessonList.replaceChildren();
   $("#course-summary").textContent = t("courseSummary", {
@@ -1472,7 +1507,7 @@ function renderLessons() {
   $("#lesson-counter").textContent = `${String(lessonIndex + 1).padStart(2, "0")} / ${String(lessons.length).padStart(2, "0")}`;
   $("#lesson-title").textContent = content.title;
   $("#lesson-description").textContent = content.description;
-  $("#lesson-goal").textContent = content.goal;
+  renderGoal($("#lesson-goal"), content.goal);
   $("#lesson-hint").textContent = content.hint;
   $("#prev-lesson").disabled = lessonIndex === 0;
   const lesson = lessons[lessonIndex];
