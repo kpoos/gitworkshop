@@ -2,9 +2,9 @@
 
 A dependency-free, bilingual Git learning environment. Use the language button in the header to switch between English and Hungarian. The commit graph and command line run in the browser; no Git installation, server, or internet connection is needed. The lessons are original, step-by-step exercises for learning branches and commits.
 
-## Release 0.0.1
+## Release 0.0.2
 
-The application release version is `0.0.1`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
+The application release version is `0.0.2`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
 
 ## Screenshots
 
@@ -15,6 +15,39 @@ The application release version is `0.0.1`. The header and footer version labels
 ## Getting started
 
 Open `index.html` in a modern browser. Lessons, repository state, and the command simulator run entirely in the browser.
+
+## Local Docker playground
+
+The **Docker playground** button opens instructions for an optional real Linux terminal. It runs locally in an isolated Alpine container; no project files or Docker socket are mounted. The terminal is exposed only on `127.0.0.1:7681`, is password-protected with a random password printed in the container logs, and the container has memory, CPU, and process limits. The container starts without Git so you can practice installing it.
+
+Requirements: Docker Engine or Docker Desktop with the Compose plugin, and an internet connection to download the container image and install packages.
+
+From the repository root, start the sandbox:
+
+```sh
+docker compose -f docker-compose.playground.yml up --build -d
+docker compose -f docker-compose.playground.yml logs git-playground
+```
+
+Copy the printed password, click **Open terminal** in the app, and sign in as `git`. In the shell, install Git and try it:
+
+```sh
+apk add git
+git --version
+git config --global user.name "Learner"
+git config --global user.email "learner@example.test"
+mkdir first-repo && cd first-repo
+git init
+echo "# First repo" > README.md
+git add README.md
+git commit -m "Initial commit"
+```
+
+The named `/workspace` volume retains practice files across container restarts. To stop the sandbox and permanently delete that volume and its contents:
+
+```sh
+docker compose -f docker-compose.playground.yml down -v
+```
 
 ## Contact and contributions
 

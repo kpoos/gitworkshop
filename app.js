@@ -32,6 +32,18 @@ const ui = {
     repoStatus: "Munkakönyvtár tiszta",
     detachedStatus: "Leválasztott HEAD",
     terminal: "Parancssor",
+    dockerPlayground: "Dockeres játszótér",
+    dockerTitle: "Valódi Git Dockerben",
+    dockerKicker: "HELYI DOCKERES HOMOKOZÓ",
+    dockerIntro: "A helyi konténerben valódi Linux-parancsokat futtathatsz, és Git-et telepíthetsz az apk add git paranccsal. Nincsenek becsatolva a géped fájljai vagy a Docker socket. Csak a /workspace nevű, törölhető Docker-kötet marad meg.",
+    dockerStepOne: "A repository gyökérkönyvtárából indítsd el az izolált konténert:",
+    dockerStepTwo: "A felhasználónév git; másold ki a jelszót a naplóból:",
+    dockerStepThree: "Nyisd meg a terminált, majd használd a git telepítéséhez és gyakorlásához az alábbi parancsokat. A port csak a saját gépeden érhető el.",
+    dockerExample: "Git telepítése és első repository",
+    dockerReset: "A konténer és minden gyakorlófájl törlése:",
+    dockerOpen: "Terminál megnyitása",
+    dockerClose: "Kész",
+    dockerCloseAria: "Bezárás",
     help: "Parancsok",
     terminalAria: "Parancssori kimenet",
     commandAria: "Git parancs",
@@ -121,6 +133,18 @@ const ui = {
     repoStatus: "Working tree clean",
     detachedStatus: "Detached HEAD",
     terminal: "Terminal",
+    dockerPlayground: "Docker playground",
+    dockerTitle: "Real Git in Docker",
+    dockerKicker: "LOCAL DOCKER SANDBOX",
+    dockerIntro: "Run real Linux commands in a local container and install Git with apk add git. No host files or Docker socket are mounted. Only the disposable Docker volume named /workspace persists.",
+    dockerStepOne: "From the repository root, start the isolated container:",
+    dockerStepTwo: "The username is git; copy the password from the logs:",
+    dockerStepThree: "Open the terminal, then use the commands below to install Git and practice. The port is reachable only from your own computer.",
+    dockerExample: "Install Git and create your first repository",
+    dockerReset: "To remove the container and all practice files:",
+    dockerOpen: "Open terminal",
+    dockerClose: "Done",
+    dockerCloseAria: "Close",
     help: "Commands",
     terminalAria: "Terminal output",
     commandAria: "Git command",
@@ -1573,6 +1597,18 @@ function applyLanguage() {
   $("#graph-legend").textContent = text.graphLegend;
   $("#graph").setAttribute("aria-label", text.graphAria);
   $("#terminal-title").textContent = text.terminal;
+  $("#docker-playground-button").textContent = text.dockerPlayground;
+  $("#docker-dialog-title").textContent = text.dockerTitle;
+  $("#docker-dialog-kicker").textContent = text.dockerKicker;
+  $("#docker-dialog-intro").textContent = text.dockerIntro;
+  $("#docker-step-one").textContent = text.dockerStepOne;
+  $("#docker-step-two").textContent = text.dockerStepTwo;
+  $("#docker-step-three").textContent = text.dockerStepThree;
+  $("#docker-example-title").textContent = text.dockerExample;
+  $("#docker-reset-copy").textContent = text.dockerReset;
+  $("#docker-terminal-link").textContent = text.dockerOpen;
+  $("#docker-dialog-done").textContent = text.dockerClose;
+  $("#docker-dialog-close").setAttribute("aria-label", text.dockerCloseAria);
   $("#help-button").textContent = text.help;
   $("#terminal-output").setAttribute("aria-label", text.terminalAria);
   $("#command-input").setAttribute("aria-label", text.commandAria);
@@ -1648,6 +1684,18 @@ $("#next-lesson").addEventListener("click", () => {
 $("#help-button").addEventListener("click", () => {
   addOutput(t("helpFirst"));
   addOutput(t("helpSecond"));
+});
+$("#docker-playground-button").addEventListener("click", () => {
+  $("#docker-playground-dialog").showModal();
+});
+$("#docker-dialog-close").addEventListener("click", () => {
+  $("#docker-playground-dialog").close();
+});
+$("#docker-dialog-done").addEventListener("click", () => {
+  $("#docker-playground-dialog").close();
+});
+$("#docker-playground-dialog").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
 applyLanguage();
