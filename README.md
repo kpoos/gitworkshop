@@ -6,9 +6,19 @@ A dependency-free, bilingual Git learning environment. Use the language button i
 
 The application release version is `0.0.1`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
 
+## Screenshots
+
+![Git Workshop lesson and simulator](./screenshots/overview.png)
+
+![Git Workshop merge graph and terminal](./screenshots/merge-workflow.png)
+
 ## Getting started
 
 Open `index.html` in a modern browser. Lessons, repository state, and the command simulator run entirely in the browser.
+
+## Contact and contributions
+
+Visit the [GitHub repository](https://github.com/kpoos/gitworkshop).
 
 ## Learning path
 
