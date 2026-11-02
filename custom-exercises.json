@@ -1,0 +1,46 @@
+{
+  "lessons": [
+    {
+      "id": "practice-small-commits",
+      "title": {
+        "hu": "Két kis commit",
+        "en": "Two small commits"
+      },
+      "category": {
+        "hu": "SAJÁT FELADAT · COMMIT",
+        "en": "CUSTOM EXERCISE · COMMITS"
+      },
+      "description": {
+        "hu": "Gyakorold, hogyan bontasz egy munkát két külön, jól érthető commitra.",
+        "en": "Practice splitting work into two separate, easy-to-understand commits."
+      },
+      "goal": {
+        "hu": "Készíts két új commitot a main ágon.",
+        "en": "Create two new commits on main."
+      },
+      "hint": {
+        "hu": "Használd kétszer a git commit -m \"üzenet\" parancsot.",
+        "en": "Run git commit -m \"message\" twice."
+      },
+      "initial": [
+        {
+          "id": "C0",
+          "parents": [],
+          "message": {
+            "hu": "Kiinduló állapot",
+            "en": "Starting point"
+          },
+          "lane": 0
+        }
+      ],
+      "branches": {
+        "main": "C0"
+      },
+      "current": "main",
+      "check": {
+        "type": "commit-count",
+        "minimum": 2
+      }
+    }
+  ]
+}

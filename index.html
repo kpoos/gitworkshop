@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10151c">
+    <meta name="application-version" content="0.0.1">
+    <title>Git műhely — tanulj gyakorlással</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Git műhely kezdőlap" id="brand-link">
+        <span class="brand-mark" aria-hidden="true">⌘</span>
+        <span>git<span class="brand-accent" id="brand-name">műhely</span></span>
+      </a>
+      <span class="version-badge" id="version-badge">v0.0.1</span>
+      <div class="topbar-note"><span class="live-dot"></span><span id="offline-note">Helyben fut · nincs szükség internetre</span></div>
+      <div class="topbar-actions">
+        <button class="button button-quiet" id="import-button" type="button" aria-label="Feladatfájl importálása">Import</button>
+        <input id="import-file" type="file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden>
+        <button class="button button-quiet" id="language-button" type="button" aria-label="Switch language">EN</button>
+        <button class="button button-quiet" id="reset-button" type="button" title="Lecke újrakezdése">Újrakezdés</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <div class="section-label" id="path-label">TANULÁSI ÚTVONAL</div>
+        <div class="course-summary" id="course-summary"></div>
+        <div class="lesson-list" id="lesson-list" aria-label="Leckék"></div>
+        <div class="sidebar-tip">
+          <span class="tip-icon" aria-hidden="true">✦</span>
+          <p id="sidebar-tip">A Git pillanatképeket ment. A branchek csak könnyű, mozgatható hivatkozások a commitokra.</p>
+        </div>
+        <div class="import-status" id="import-status" role="status" aria-live="polite">
+          <span id="import-message"></span>
+          <button class="text-button" id="clear-imported" type="button" hidden>Eltávolítás</button>
+        </div>
+        <div class="sidebar-footer"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span> <span>·</span> <span id="footer-version">v0.0.1</span></div>
+      </aside>
+
+      <section class="lesson-panel" aria-live="polite">
+        <div class="lesson-meta">
+          <span class="eyebrow" id="lesson-category"></span>
+          <span class="lesson-counter" id="lesson-counter"></span>
+        </div>
+        <h1 id="lesson-title"></h1>
+        <p class="lesson-description" id="lesson-description"></p>
+        <div class="goal-card">
+          <div class="goal-icon" aria-hidden="true">◎</div>
+          <div><strong id="goal-label">Feladat</strong><p id="lesson-goal"></p></div>
+        </div>
+        <div class="concept-card">
+          <div class="concept-heading"><span aria-hidden="true">◈</span> <span id="concept-label">GONDOLJ ERRE</span></div>
+          <p id="lesson-hint"></p>
+        </div>
+        <div class="lesson-actions">
+          <button class="button button-secondary" id="prev-lesson" type="button">← <span id="prev-label">Előző</span></button>
+          <button class="button button-primary" id="next-lesson" type="button" disabled><span id="next-label">Következő lecke</span> <span>→</span></button>
+        </div>
+      </section>
+
+      <section class="playground" aria-label="Git gyakorlófelület" id="playground">
+        <div class="graph-panel">
+          <div class="panel-heading">
+            <div><span class="panel-kicker">REPOSITORY</span><h2 id="graph-title">Commitgráf</h2></div>
+            <div class="graph-legend"><span class="legend-line"></span><span id="graph-legend">commit-történet</span></div>
+          </div>
+          <div class="graph-scroll" id="graph-scroll">
+            <div id="graph" class="graph" role="img" aria-label="A Git repository commitgráfja"></div>
+          </div>
+          <div class="graph-footer">
+            <span><span class="status-dot"></span><span id="repo-status">Munkakönyvtár tiszta</span></span>
+            <span id="commit-count"></span>
+          </div>
+        </div>
+
+        <div class="terminal-panel">
+          <div class="terminal-heading">
+            <div class="terminal-title"><span class="terminal-icon" aria-hidden="true">›_</span><h2 id="terminal-title">Parancssor</h2></div>
+            <button class="text-button" id="help-button" type="button">Parancsok</button>
+          </div>
+          <div class="terminal-output" id="terminal-output" role="log" aria-live="polite" aria-label="Parancssori kimenet"></div>
+          <form class="command-form" id="command-form" autocomplete="off">
+            <label for="command-input" class="prompt" id="terminal-prompt">main ❯</label>
+            <input id="command-input" name="command" type="text" spellcheck="false" autocapitalize="off" placeholder="git commit -m &quot;Első változtatás&quot;" aria-label="Git parancs">
+            <button class="run-button" id="run-command" type="submit" aria-label="Parancs futtatása">↵</button>
+          </form>
+          <div class="terminal-hint"><span id="terminal-hint">Nyomj</span> <kbd>Enter</kbd><span id="run-hint">-t a futtatáshoz</span> <span>·</span> <kbd>↑</kbd> <span id="history-hint">előző parancs</span></div>
+        </div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

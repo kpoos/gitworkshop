@@ -1,0 +1,43 @@
+lessons:
+  - id: practice-review-branch
+    title:
+      hu: "Reviewre kész feature branch"
+      en: "Feature branch ready for review"
+    category:
+      hu: "SAJÁT FELADAT · BRANCHEK"
+      en: "CUSTOM EXERCISE · BRANCHES"
+    description:
+      hu: |
+        Készíts saját commitot az előkészített feature ágon.
+        A main ág maradjon változatlan.
+      en: |
+        Create your own commit on the prepared feature branch.
+        Leave main unchanged.
+    goal:
+      hu: "Válts feature ágra, és készíts rajta legalább egy commitot."
+      en: "Switch to feature and make at least one commit there."
+    hint:
+      hu: "Használd a git switch feature, majd a git commit -m \"Reviewre kész\" parancsot."
+      en: "Use git switch feature, then git commit -m \"Ready for review\"."
+    initial:
+      - id: C0
+        parents: []
+        message:
+          hu: "Kiindulás"
+          en: "Starting point"
+        lane: 0
+      - id: C1
+        parents:
+          - C0
+        message:
+          hu: "Main frissítve"
+          en: "Main updated"
+        lane: 0
+    branches:
+      main: C1
+      feature: C1
+    current: main
+    check:
+      type: branch-ahead
+      branch: feature
+      base: main
