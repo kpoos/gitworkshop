@@ -156,10 +156,22 @@ button { color: inherit; }
 .lesson-counter { color: var(--subtle); font-family: var(--mono); font-size: 10px; }
 h1 { margin: 17px 0 10px; font-size: clamp(24px, 2.2vw, 31px); letter-spacing: -1.2px; line-height: 1.15; }
 .lesson-description { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; white-space: pre-line; }
-.goal-card { display: flex; gap: 12px; margin-top: 25px; padding: 15px; border: 1px solid #35443f; border-radius: 9px; background: linear-gradient(120deg, #1d2b29, #19232a); }
-.goal-icon { color: var(--accent); font-size: 21px; line-height: 1; }
-.goal-card strong { display: block; margin: 0 0 5px; font-size: 12px; }
-.goal-card p { margin: 0; color: #c0cbc9; font-size: 12px; line-height: 1.65; }
+.goal-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-top: 25px;
+  padding: 18px 17px;
+  border: 2px solid #e8a34f;
+  border-left-width: 6px;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #3a2a19, #25231f 74%, #1c2530);
+  box-shadow: 0 0 0 3px rgb(232 163 79 / 10%), 0 8px 24px rgb(0 0 0 / 18%);
+}
+.goal-icon { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border-radius: 8px; background: #e8a34f; color: #20170d; font-size: 20px; font-weight: 800; line-height: 1; }
+.goal-card strong { display: block; margin: 0 0 7px; color: #ffc078; font-size: 12px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
+.goal-card p { margin: 0; color: #fff3e2; font-size: 14px; font-weight: 650; line-height: 1.7; overflow-wrap: anywhere; }
 .concept-card { margin-top: 17px; padding: 14px 15px; border: 1px solid var(--border); border-radius: 9px; background: rgb(23 30 39 / 65%); }
 .concept-heading { display: flex; align-items: center; gap: 7px; color: var(--orange); font-size: 9px; }
 .concept-card p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
