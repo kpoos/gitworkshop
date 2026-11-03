@@ -99,8 +99,55 @@ const ui = {
     commitCount: "{count} commit",
     language: "EN",
     languageAria: "Switch language to English",
+    // Email & Progress dialogs
+    progressTitle: "Tanulási előrehaladás",
+    progressClose: "Bezárás",
+    progressReset: "Előrehaladás törlése",
+    progressResetConfirm: "Biztosan törölni szeretnéd az előrehaladásod? Ez a művelet nem vonható vissza.",
+    progressNoData: "Nincs elmentett előrehaladás.",
+    progressCompleted: "Befejezett leckék",
+    progressCurrent: "Jelenlegi lecke",
+    progressTotal: "Összes lecke",
+    progressButton: "Előrehaladás",
   },
   en: {
+    title: "Git Workshop — learn by doing",
+    brand: "Git Workshop home",
+    brandName: "workshop",
+    offline: "Runs locally · no internet required",
+    import: "Import",
+    importAria: "Import exercise file",
+    importTitle: "Load an exercise file in JSON or YAML format",
+    importSuccess: "Imported {count} exercises. They will remain available after reload.",
+    importLoaded: "Loaded {count} custom exercises.",
+    clearImported: "Remove",
+    clearSuccess: "Imported exercises removed.",
+    importError: "Import error: {message}",
+    reset: "Restart",
+    resetTitle: "Restart lesson",
+    path: "LEARNING PATH",
+    lessons: "Lessons",
+    courseSummary: "{lessons} lessons · {exercises} exercises",
+    tip: "Git saves snapshots. Branches are lightweight, movable references to commits.",
+    footer: "Self-guided learning environment",
+    goal: "Your task",
+    concept: "THE IDEA",
+    previous: "Previous",
+    next: "Next lesson",
+    finish: "Finish learning path",
+    courseComplete: "You completed the learning path. Feel free to keep practicing.",
+    playground: "Git practice area",
+    graph: "Commit graph",
+    graphLegend: "commit history",
+    progressTitle: "Learning Progress",
+    progressClose: "Close",
+    progressReset: "Clear Progress",
+    progressResetConfirm: "Are you sure you want to clear your progress? This cannot be undone.",
+    progressNoData: "No saved progress found.",
+    progressCompleted: "Completed Lessons",
+    progressCurrent: "Current Lesson",
+    progressTotal: "Total Lessons",
+    progressButton: "Progress",
     title: "Git Workshop — learn by doing",
     brand: "Git Workshop home",
     brandName: "workshop",
@@ -200,6 +247,15 @@ const ui = {
     commitCount: "{count} commits",
     language: "HU",
     languageAria: "Váltás magyar nyelvre",
+    // Email & Progress dialogs
+    progressTitle: "Learning Progress",
+    progressClose: "Close",
+    progressReset: "Clear Progress",
+    progressResetConfirm: "Are you sure you want to clear your progress? This cannot be undone.",
+    progressNoData: "No saved progress found.",
+    progressCompleted: "Completed Lessons",
+    progressCurrent: "Current Lesson",
+    progressTotal: "Total Lessons",
   },
 };
 
@@ -688,6 +744,7 @@ lessons.forEach((lesson, index) => {
   lesson.id = `builtin-${String(index + 1).padStart(2, "0")}`;
 });
 const importedStorageKey = "git-workshop-imported-lessons-v1";
+const progressStorageKey = "git-workshop-progress-v1";
 let importedSources = [];
 
 function stripYamlComment(text) {
@@ -1139,6 +1196,7 @@ function parseCommand(raw) {
     addOutput(t("undone"), "success");
     render();
     checkLesson();
+    saveProgress();
     return;
   }
 
@@ -1165,6 +1223,7 @@ function parseCommand(raw) {
           if (!Object.hasOwn(state.config[scope], key)) throw new Error(t("configMissing", { key }));
           delete state.config[scope][key];
           history.push(before);
+          saveProgress();
           output = t("configUnset", { key });
           break;
         }
@@ -1185,6 +1244,7 @@ function parseCommand(raw) {
         const value = settingValue.join(" ");
         state.config[scope][key] = value;
         history.push(before);
+        saveProgress();
         output = t("configSet", {
           scope: scope === "global"
             ? (language === "hu" ? "Globális" : "Global")
@@ -1209,6 +1269,7 @@ function parseCommand(raw) {
           if (state.remotes[name]) throw new Error(t("remoteExists", { name }));
           state.remotes[name] = url;
           history.push(before);
+          saveProgress();
           output = t("remoteAdded", { name, url });
           break;
         }
@@ -1217,6 +1278,7 @@ function parseCommand(raw) {
           if (!state.remotes[name]) throw new Error(t("remoteMissing", { name }));
           state.remotes[name] = url;
           history.push(before);
+          saveProgress();
           output = t("remoteUpdated", { name, url });
           break;
         }
@@ -1231,6 +1293,7 @@ function parseCommand(raw) {
           if (!state.remotes[name]) throw new Error(t("remoteMissing", { name }));
           delete state.remotes[name];
           history.push(before);
+          saveProgress();
           output = t("remoteRemoved", { name });
           break;
         }
@@ -1249,6 +1312,7 @@ function parseCommand(raw) {
         if (!message) throw new Error(t("emptyMessage"));
         const id = commit(message);
         history.push(before);
+        saveProgress();
         output = `[${currentBranch()} ${id}] ${message}`;
         break;
       }
@@ -1259,6 +1323,7 @@ function parseCommand(raw) {
         state.branches[name] = headId();
         state.branchLanes[name] = allocateLane();
         history.push(before);
+        saveProgress();
         output = t("branchCreated", { name });
         break;
       }
@@ -1286,6 +1351,7 @@ function parseCommand(raw) {
           throw new Error(t("refNotFound", { name }));
         }
         history.push(before);
+        saveProgress();
         break;
       }
       case "merge": {
@@ -1299,11 +1365,13 @@ function parseCommand(raw) {
         } else if (isAncestor(ours, theirs)) {
           state.branches[state.current] = theirs;
           history.push(before);
+          saveProgress();
           output = t("fastForward", { ours, theirs });
         } else {
           const base = commonAncestor(ours, theirs);
           const mergeId = commit(`Merge branch '${name}'`, [ours, theirs]);
           history.push(before);
+          saveProgress();
           output = t("merged", { id: mergeId, base: base || (language === "hu" ? "nincs" : "none") });
         }
         break;
@@ -1316,6 +1384,7 @@ function parseCommand(raw) {
         if (!state.current) throw new Error(t("mergeSwitch"));
         const id = commit(source.message, [headId()], source.translations);
         history.push(before);
+        saveProgress();
         output = t("cherryPicked", { source: sourceId, id });
         break;
       }
@@ -1342,6 +1411,7 @@ function parseCommand(raw) {
         let parent = newBase;
         for (const oldCommit of replay.reverse()) parent = commit(oldCommit.message, [parent], oldCommit.translations);
         history.push(before);
+        saveProgress();
         output = t("rebased", { count: replay.length, base: newBase });
         break;
       }
@@ -1358,6 +1428,7 @@ function parseCommand(raw) {
     if (output) addOutput(output, "result");
     render();
     checkLesson();
+    saveProgress();
   } catch (error) {
     state = before;
     addOutput(error.message, "error");
@@ -1519,6 +1590,111 @@ function renderLessons() {
     : isLast && completedLessons.has(lessonIndex);
 }
 
+// Progress saving/loading functions
+function getProgressKey() {
+  return progressStorageKey;
+}
+
+function saveProgress() {
+  const progress = {
+    lessonIndex,
+    completedLessons: Array.from(completedLessons),
+    state: state ? JSON.parse(JSON.stringify(state)) : null,
+    history: history.map(h => JSON.parse(JSON.stringify(h))),
+    commandHistory,
+    commandHistoryIndex,
+    timestamp: Date.now(),
+  };
+  localStorage.setItem(getProgressKey(), JSON.stringify(progress));
+}
+
+function loadProgress() {
+  const key = getProgressKey();
+  const stored = localStorage.getItem(key);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    console.error("Failed to parse progress:", e);
+    return null;
+  }
+}
+
+function clearProgress() {
+  const key = getProgressKey();
+  localStorage.removeItem(key);
+}
+
+function applyProgress(progress) {
+  if (!progress) return false;
+
+  lessonIndex = progress.lessonIndex || 0;
+  completedLessons.clear();
+  (progress.completedLessons || []).forEach(idx => completedLessons.add(idx));
+
+  if (progress.state) {
+    state = progress.state;
+  } else {
+    state = freshState(lessons[lessonIndex]);
+  }
+
+  history = (progress.history || []).map(h => JSON.parse(JSON.stringify(h)));
+  commandHistory = progress.commandHistory || [];
+  commandHistoryIndex = progress.commandHistoryIndex || 0;
+
+  return true;
+}
+
+function showProgressDialog() {
+  renderProgressDialog();
+  $("#progress-dialog").showModal();
+}
+
+function hideProgressDialog() {
+  $("#progress-dialog").close();
+}
+
+function renderProgressDialog() {
+  const content = $("#progress-content");
+  const progress = loadProgress();
+
+  if (!progress) {
+    content.innerHTML = `<p style="color: var(--muted); text-align: center; padding: 40px;">${t("progressNoData")}</p>`;
+    return;
+  }
+
+  const completedCount = progress.completedLessons?.length || 0;
+  const currentLessonNum = (progress.lessonIndex || 0) + 1;
+  const totalLessons = lessons.length;
+
+  let html = `
+    <div class="progress-summary">
+      <div class="progress-stats">
+        <div><span style="color: var(--accent); font-weight: 700;">${completedCount}</span> / ${totalLessons} ${t("progressCompleted")}</div>
+        <div>${t("progressCurrent")}: <strong>${currentLessonNum}</strong></div>
+      </div>
+    </div>
+    <div class="progress-lessons">
+  `;
+
+  lessons.forEach((lesson, index) => {
+    const isComplete = progress.completedLessons?.includes(index) || false;
+    const isCurrent = index === progress.lessonIndex;
+    const lessonTitle = lesson.content[language]?.title || lesson.content.hu?.title || "Ismeretlen";
+    const number = isComplete ? "✓" : String(index + 1).padStart(2, "0");
+    const classes = `progress-lesson${isComplete ? " complete" : ""}${isCurrent ? " current" : ""}`;
+    html += `
+      <div class="${classes}">
+        <div class="progress-lesson-number">${number}</div>
+        <div class="progress-lesson-name">${lessonTitle}</div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
 function checkLesson() {
   if ((lessons[lessonIndex].type || "exercise") !== "exercise") return;
   if (!lessons[lessonIndex].check(state)) {
@@ -1528,6 +1704,7 @@ function checkLesson() {
   }
   completedLessons.add(lessonIndex);
   renderLessons();
+  saveProgress();
   if (!$("#next-lesson").dataset.announced) {
     addOutput(t(lessonIndex === lessons.length - 1 ? "allCompleted" : "completed"), "success");
     $("#next-lesson").dataset.announced = "true";
@@ -1645,6 +1822,7 @@ function applyLanguage() {
   $("#docker-dialog-done").textContent = text.dockerClose;
   $("#docker-dialog-close").setAttribute("aria-label", text.dockerCloseAria);
   $("#help-button").textContent = text.help;
+  $("#progress-button").textContent = text.progressButton;
   $("#terminal-output").setAttribute("aria-label", text.terminalAria);
   $("#command-input").setAttribute("aria-label", text.commandAria);
   $("#command-input").placeholder = text.placeholder;
@@ -1664,6 +1842,7 @@ function loadLesson(index) {
   $("#next-lesson").dataset.announced = "";
   setWelcome();
   render();
+  saveProgress();
 }
 
 restoreImportedLessons();
@@ -1714,6 +1893,7 @@ $("#next-lesson").addEventListener("click", () => {
     $("#next-lesson").disabled = true;
     addOutput(t("courseComplete"), "success");
     renderLessons();
+    saveProgress();
   }
 });
 $("#help-button").addEventListener("click", () => {
@@ -1733,5 +1913,47 @@ $("#docker-playground-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
+// Progress dialog events
+$("#progress-button").addEventListener("click", () => {
+  showProgressDialog();
+});
+
+$("#progress-dialog-close").addEventListener("click", () => {
+  hideProgressDialog();
+});
+
+$("#progress-close").addEventListener("click", () => {
+  hideProgressDialog();
+});
+
+$("#progress-dialog").addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) hideProgressDialog();
+});
+
+$("#progress-reset").addEventListener("click", () => {
+  if (confirm(t("progressResetConfirm"))) {
+    clearProgress();
+    lessonIndex = 0;
+    completedLessons.clear();
+    state = freshState(lessons[0]);
+    history = [];
+    commandHistory = [];
+    commandHistoryIndex = 0;
+    hideProgressDialog();
+    render();
+    setWelcome();
+  }
+});
+
 applyLanguage();
 loadLesson(0);
+
+// Try to load existing progress on startup
+const progress = loadProgress();
+if (progress && applyProgress(progress)) {
+  addOutput(`${t("welcome")} — ${t("progressCurrent")}: ${lessons[lessonIndex].content[language].title}`, "success");
+} else {
+  addOutput(t("welcome"), "success");
+  if (lessonIndex === 0) addOutput(t("example"));
+}
+render();

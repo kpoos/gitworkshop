@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#10151c">
-    <meta name="application-version" content="0.0.2">
+    <meta name="application-version" content="0.0.3">
     <title>Git műhely — tanulj gyakorlással</title>
     <link rel="stylesheet" href="style.css">
   </head>
@@ -14,13 +14,14 @@
         <span class="brand-mark" aria-hidden="true">⌘</span>
         <span>git<span class="brand-accent" id="brand-name">műhely</span></span>
       </a>
-      <span class="version-badge" id="version-badge">v0.0.2</span>
+      <span class="version-badge" id="version-badge">v0.0.3</span>
       <div class="topbar-note"><span class="live-dot"></span><span id="offline-note">Helyben fut · nincs szükség internetre</span></div>
       <div class="topbar-actions">
         <button class="button button-quiet" id="import-button" type="button" aria-label="Feladatfájl importálása">Import</button>
         <input id="import-file" type="file" accept=".json,.yaml,.yml,application/json,text/yaml" hidden>
         <button class="button button-quiet" id="language-button" type="button" aria-label="Switch language">EN</button>
         <button class="button button-quiet" id="reset-button" type="button" title="Lecke újrakezdése">Újrakezdés</button>
+        <button class="button button-quiet" id="progress-button" type="button" aria-label="Tanulási előrehaladás" data-i18n="progressButton"></button>
       </div>
     </header>
 
@@ -38,7 +39,7 @@
           <button class="text-button" id="clear-imported" type="button" hidden>Eltávolítás</button>
         </div>
         <footer class="sidebar-footer">
-          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.2</span></span></div>
+          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.3</span></span></div>
           <a href="https://github.com/kpoos/gitworkshop" target="_blank" rel="noopener noreferrer">github.com/kpoos/gitworkshop</a>
         </footer>
       </aside>
@@ -98,6 +99,49 @@
       </section>
     </main>
     <dialog class="docker-dialog" id="docker-playground-dialog" aria-labelledby="docker-dialog-title">
+      <div class="docker-dialog-heading">
+        <div>
+          <span class="panel-kicker" id="docker-dialog-kicker">LOCAL DOCKER SANDBOX</span>
+          <h2 id="docker-dialog-title">Valódi Git Dockerben</h2>
+        </div>
+        <button class="button button-quiet" id="docker-dialog-close" type="button" aria-label="Bezárás">×</button>
+      </div>
+      <p class="docker-dialog-intro" id="docker-dialog-intro"></p>
+      <ol class="docker-steps">
+        <li><span id="docker-step-one"></span><pre><code>docker compose -f docker-compose.playground.yml up --build -d</code></pre></li>
+        <li><span id="docker-step-two"></span><pre><code>docker compose -f docker-compose.playground.yml logs git-playground</code></pre></li>
+        <li><span id="docker-step-three"></span></li>
+      </ol>
+      <div class="docker-dialog-example">
+        <strong id="docker-example-title"></strong>
+        <pre><code>apk add git
+git --version
+git config --global user.name "Learner"
+git config --global user.email "learner@example.test"
+mkdir first-repo && cd first-repo
+git init
+echo "# First repo" > README.md
+git add README.md
+git commit -m "Initial commit"</code></pre>
+      </div>
+      <p class="docker-dialog-reset"><span id="docker-reset-copy"></span> <code>docker compose -f docker-compose.playground.yml down -v</code></p>
+      <div class="docker-dialog-actions">
+        <a class="button button-primary" id="docker-terminal-link" href="http://127.0.0.1:7681/" target="_blank" rel="noopener noreferrer"></a>
+        <button class="button button-secondary" id="docker-dialog-done" type="button"></button>
+      </div>
+    </dialog>
+
+    <dialog class="progress-dialog" id="progress-dialog" aria-labelledby="progress-dialog-title">
+      <div class="progress-dialog-heading">
+        <h2 id="progress-dialog-title">Tanulási előrehaladás</h2>
+        <button class="button button-quiet" id="progress-dialog-close" type="button" aria-label="Bezárás">×</button>
+      </div>
+      <div class="progress-content" id="progress-content"></div>
+      <div class="progress-dialog-actions">
+        <button class="button button-secondary" id="progress-reset" type="button">Előrehaladás törlése</button>
+        <button class="button button-primary" id="progress-close" type="button">Bezárás</button>
+      </div>
+    </dialog>
       <div class="docker-dialog-heading">
         <div>
           <span class="panel-kicker" id="docker-dialog-kicker">LOCAL DOCKER SANDBOX</span>
