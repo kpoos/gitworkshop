@@ -18,15 +18,17 @@ Magyar leírás: [README.hu.md](./README.hu.md)
 
 ## Getting started
 
-Requirements: Docker Engine or Docker Desktop with the Compose plugin, and an internet connection for the initial image build.
+Requirements: Docker Engine or Docker Desktop with Compose support, `curl`, and an internet connection for the initial image build.
 
-From the repository root, build and start the environment:
+Clone the repository, then start the environment from its root:
 
 ```sh
-docker compose up --build -d
+./install.sh start
 ```
 
-Then open <http://localhost:3000> in a modern browser. The web interface, the commit graph, and the terminal all run inside the `git-workshop` container. The port is bound to `127.0.0.1`, so the app is reachable only from your own machine.
+The script builds the Docker image, starts the container, waits for the application to be ready, and prints its URL. Open <http://localhost:3000> in a modern browser. The port is bound to `127.0.0.1`, so the app is reachable only from your own machine.
+
+Manage the environment with `./install.sh status`, `./install.sh logs`, `./install.sh restart`, and `./install.sh stop`. Run `./install.sh help` for more information. Practice repositories persist in the `git-workshop-data` Docker volume across stops.
 
 ## Real commands, verified exercises
 
