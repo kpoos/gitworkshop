@@ -3,8 +3,17 @@
 # command as a real process inside this image.
 FROM node:20-alpine
 
-# Real git for the in-container terminal
-RUN apk add --no-cache git
+# Bash and real git for the in-container terminal.
+RUN apk add --no-cache bash git \
+    && mkdir -p /opt/git-workshop/bin \
+    && printf '%s\n' \
+        '#!/bin/sh' \
+        '/usr/bin/git "$@"' \
+        'status=$?' \
+        'if [ "${GIT_WORKSHOP_GIT_LOG_FD:-}" = "3" ]; then printf "git\000%s\000" "$status" >&3; fi' \
+        'exit "$status"' \
+        > /opt/git-workshop/bin/git \
+    && chmod 755 /opt/git-workshop/bin/git
 
 WORKDIR /app
 

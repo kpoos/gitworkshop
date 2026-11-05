@@ -38,9 +38,9 @@ A lecke-commitok megkapják a feladat-azonosítókat (`C0`, `C1`, …) címkék 
 
 A terminál fejlécében további vezérlők vannak. A **Feladat ellenőrzése** gomb igény szerint újrafuttatja a szerveroldali ellenőrzést: jelenti a bizonyítékokat (valós repository-állapot plusz a lecke betöltése óta végrehajtott valós `git` parancsok száma), teljesítéskor megjelöli az aktuális feladatot, a következő megnyomásra pedig továbblép a következő feladatra. A **Súgás** gomb lépésről lépésre tárja fel az aktuális feladatot a terminálban — először a célt, aztán a tippet, végül a konténerben futtatható pontos parancsokat.
 
-A terminál valós shell-promptot mutat a `learner@git-workshop:~/repo$` formában, amely követi a munkamenet munkakönyvtárát, ahogy `cd`-zel mozogsz.
+A terminál Bash-parancsokat futtat, és valós shell-promptot mutat a `learner@git-workshop:~/repo$` formában, amely követi a munkamenet munkakönyvtárát, ahogy `cd`-zel mozogsz. A `~/fajl.txt` és `$HOME` feloldása, a változók, idézőjelek, globok, csővezetékek, átirányítások, parancshelyettesítés és parancsláncolás a megszokott shell-viselkedés szerint működik. A munkakönyvtár, a változók, a függvények és az aliasok megmaradnak a munkamenet parancsai között. Minden parancs a Docker konténerben fut.
 
-Ez egy korlátozott parancssor, nem teljes Bash shell. A `Tab` kiegészíti az engedélyezett parancsokat, a gyakorlómunkamenet fájl- és könyvtárneveit, valamint a Git-ágakat; több találatnál ismét nyomd meg a `Tab` billentyűt a lista megjelenítéséhez.
+A `Tab` gyakori parancsokat, fájl- és könyvtárneveket, valamint Git-ágakat egészít ki; több találatnál ismét nyomd meg a `Tab` billentyűt a lista megjelenítéséhez.
 
 ## Leállítás és visszaállítás
 
@@ -98,14 +98,12 @@ Az YAML-importáló a szokásos behúzott leképezéseket/listákat, idézett é
 
 ## Terminálparancsok
 
-A terminál a konténerben fut, és rögzített engedélyezési listáról fogad valós programokat:
+A terminál Bash-t futtat a konténerben:
 
-- `git …` — korlátlan valódi git: `status`, `log`, `config`, `remote`, `commit`, `branch`, `switch`, `merge`, `rebase`, `cherry-pick`, `clone`, `fetch`, `pull`, `reset`, `revert`, `restore` és minden más, amit a git támogat
-- fájlsegédek: `ls`, `pwd`, `cat`, `echo`, `mkdir`, `touch`, `rm`, `cp`, `mv`, `head`, `tail`, `wc`, `grep`, `stat`, `find`, `date`, `whoami`, `uname`, …
-- `cd <könyvtár>` — mozgás a munkamenet munkaterületén belül
-- `clear` — a terminál kimenetének törlése, `help` — a gyakori parancsok listája
-- kimeneti átirányítás (`echo szöveg > fajl.txt`, `>>`) és `&&` láncolás
+- A szokásos shell-szintaxis működik, beleértve a `~`/`$HOME` feloldást, változókat, idézőjeleket, globokat, csővezetékeket, átirányításokat, parancshelyettesítést és az `&&`/`||`/`;` láncolást.
+- A `git …` a konténer valódi Git binárisát futtatja. A Git-konfiguráció és a gyakorló repository-k munkamenetenként különülnek el.
+- A `clear` törli a webes terminál kimenetét; a `help` shell-példákat mutat.
 
-Minden más (például `bash` vagy `node`) hibával elutasításra kerül. A konténer a homokozó: nincsenek gazdafájlok és Docker socket becsatolva, a folyamat nem privilegizált felhasználóként fut, a compose fájl pedig memória-, CPU-, folyamat- és jogosultság-korlátokat alkalmaz. Hálózatot igénylő git parancsok (`clone`, `fetch`, `pull`) a konténeren belülről futnak, így a rossz URL egyszerűen a git saját hibaüzenetével bukik el.
+A parancsok nem privilegizált felhasználóként futnak a Docker konténerben; nincs becsatolva gazdagép-fájl vagy Docker socket. A Compose konfiguráció memória-, CPU-, folyamat- és jogosultság-korlátokat alkalmaz. Hálózatot igénylő Git-parancsok (`clone`, `fetch`, `pull`) a konténeren belülről futnak, így a hibás URL a Git saját hibaüzenetével bukik el.
 
 A konfigurációváltoztatások, remoteok és commitok a kontéren belüli munkamenet repository-jában élnek — soha nem érintik a gazdagép git-konfigurációját. A feladatelőrehaladás (aktuális lecke és teljesített feladatok) a konténer kötetében tárolódik és a böngészőbe is tükröződik.
