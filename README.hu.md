@@ -16,15 +16,17 @@ Az alkalmazás verziószáma `0.0.4`. A fejléc és lábléc verziófeliratai az
 
 ## Első lépések
 
-Előfeltételek: Docker Engine vagy Docker Desktop a Compose bővítménnyel, valamint internetkapcsolat a kép első építéséhez.
+Előfeltételek: Docker Engine vagy Docker Desktop Compose támogatással, `curl`, valamint internetkapcsolat a kép első építéséhez.
 
-A repository gyökérkönyvtárából építsd fel és indítsd el a környezetet:
+Klónozd a repository-t, majd annak gyökérkönyvtárából indítsd el a környezetet:
 
 ```sh
-docker compose up --build -d
+./install.sh start
 ```
 
-Majd nyisd meg a <http://localhost:3000> címet egy modern böngészőben. A webfelület, a commitgráf és a terminál is a `git-workshop` konténeren belül fut. A port a `127.0.0.1` címre van kötve, így az alkalmazás csak a saját gépedről érhető el.
+A script felépíti a Docker image-et, elindítja a konténert, megvárja az alkalmazás indulását, majd kiírja az elérhetőséget. Nyisd meg a <http://localhost:3000> címet egy modern böngészőben. A port a `127.0.0.1` címre van kötve, így az alkalmazás csak a saját gépedről érhető el.
+
+A környezet kezeléséhez használd a `./install.sh status`, `./install.sh logs`, `./install.sh restart` és `./install.sh stop` parancsokat. A `./install.sh help` további információt ad. A gyakorló repository-k a `git-workshop-data` Docker-kötetben maradnak meg a leállítások között.
 
 ## Valós parancsok, ellenőrzött feladatok
 
