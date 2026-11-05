@@ -1,0 +1,1098 @@
+"use strict";
+
+/*
+ * Git Workshop backend.
+ *
+ * Runs inside the Docker container: every command arriving from the web UI is
+ * executed as a real process (real `git`) in the session's repository, and
+ * exercises are verified server-side against the resulting repository state
+ * plus the log of commands that were actually executed. Nothing is simulated.
+ */
+
+const http = require("http");
+const fs = require("fs");
+const fsp = fs.promises;
+const path = require("path");
+const os = require("os");
+const crypto = require("crypto");
+const { spawn } = require("child_process");
+const { createLessons, validateImportedFile } = require("../../shared/lessons.js");
+
+const PORT = Number(process.env.PORT || 3000);
+const ROOT = path.resolve(__dirname, "..", "..");
+const WORKSPACE = process.env.GIT_WORKSHOP_WORKSPACE || path.join(ROOT, ".workspace");
+const SESSIONS_DIR = path.join(WORKSPACE, "sessions");
+const COMMAND_TIMEOUT_MS = 15000;
+const MAX_OUTPUT_BYTES = 200_000;
+const MAX_BODY_BYTES = 1_500_000;
+const MAX_IMPORTS = 200;
+const MAX_COMMAND_LENGTH = 500;
+const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+const { lessons: builtinLessons, builtinCount } = createLessons();
+const builtinIds = new Set(builtinLessons.map((lesson) => lesson.id));
+const SHELL_HOST = os.hostname();
+const SHELL_USER = (() => {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return process.env.USER || "user";
+  }
+})();
+
+// Commands the terminal may execute in the container. Everything else is
+// rejected so the sandbox stays predictable; `git` itself is unrestricted.
+const ALLOWED_COMMANDS = new Set([
+  "git", "ls", "pwd", "cat", "echo", "mkdir", "rmdir", "touch", "rm", "cp", "mv",
+  "head", "tail", "wc", "grep", "tree", "find", "date", "whoami", "uname", "env",
+  "printenv", "stat", "du", "df", "sort", "uniq", "basename", "dirname", "which",
+  "true", "false", "test",
+]);
+
+const sessions = new Map();
+
+/* ------------------------------------------------------------------ */
+/* Process execution                                                   */
+/* ------------------------------------------------------------------ */
+
+function baseEnv(session) {
+  return {
+    PATH: process.env.PATH,
+    // HOME is the session directory itself, so the repository lives at
+    // ~/repo and shell prompts can show a real ~-relative path.
+    HOME: session.dir,
+    LANG: "C.UTF-8",
+    LC_ALL: "C.UTF-8",
+    TERM: "dumb",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_PAGER: "cat",
+    PAGER: "cat",
+  };
+}
+
+function identityEnv() {
+  return {
+    GIT_AUTHOR_NAME: "Learner",
+    GIT_AUTHOR_EMAIL: "learner@example.test",
+    GIT_COMMITTER_NAME: "Learner",
+    GIT_COMMITTER_EMAIL: "learner@example.test",
+  };
+}
+
+function runProcess(program, args, options = {}) {
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    let bytes = 0;
+    let truncated = false;
+    let timedOut = false;
+    let fileStream = null;
+
+    const child = spawn(program, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (options.stdoutFile) {
+      fileStream = fs.createWriteStream(options.stdoutFile, { flags: options.append ? "a" : "w" });
+    }
+
+    child.stdout.on("data", (chunk) => {
+      if (fileStream) {
+        fileStream.write(chunk);
+        return;
+      }
+      bytes += chunk.length;
+      if (bytes > MAX_OUTPUT_BYTES) {
+        truncated = true;
+        return;
+      }
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes > MAX_OUTPUT_BYTES) {
+        truncated = true;
+        return;
+      }
+      stderr += chunk.toString();
+    });
+
+    if (options.input !== undefined) child.stdin.end(options.input);
+    else child.stdin.end();
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, options.timeout || COMMAND_TIMEOUT_MS);
+
+    const finish = (result) => {
+      clearTimeout(timer);
+      if (fileStream) fileStream.end();
+      resolve(result);
+    };
+
+    child.on("error", (error) => {
+      finish({ code: 127, stdout, stderr: `${stderr}${error.message}\n`, truncated, timedOut, pid: null });
+    });
+    child.on("close", (code) => {
+      let output = stdout;
+      if (truncated) output += `\n[output truncated after ${MAX_OUTPUT_BYTES} bytes]`;
+      if (timedOut) output += `\n[timed out after ${COMMAND_TIMEOUT_MS / 1000}s]`;
+      finish({ code: code === null ? 1 : code, stdout: output, stderr, truncated, timedOut, pid: child.pid });
+    });
+  });
+}
+
+function runGit(session, args, options = {}) {
+  return runProcess("git", args, {
+    cwd: options.cwd || session.repoDir,
+    env: { ...baseEnv(session), ...identityEnv(), ...(options.env || {}) },
+    input: options.input,
+    timeout: options.timeout,
+    stdoutFile: options.stdoutFile,
+    append: options.append,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Sessions                                                            */
+/* ------------------------------------------------------------------ */
+
+function sessionDir(sessionId) {
+  return path.join(SESSIONS_DIR, sessionId);
+}
+
+function freshMeta(lessonId, lessonIndex, language, imported) {
+  return {
+    lessonId,
+    lessonIndex,
+    language,
+    imported,
+    verifiedLessons: [],
+    idMap: {},
+    nextId: 1,
+    execLog: [],
+    execSinceSeed: 0,
+    gitSuccessSinceSeed: 0,
+    cwd: "repo",
+  };
+}
+
+async function saveMeta(session) {
+  const target = path.join(session.dir, "meta.json");
+  const tmp = `${target}.tmp`;
+  await fsp.writeFile(tmp, JSON.stringify(session.meta, null, 2));
+  await fsp.rename(tmp, target);
+}
+
+function normalizeLanguage(value) {
+  return value === "hu" ? "hu" : "en";
+}
+
+function normalizeLessonIndex(value) {
+  const index = Number.parseInt(value, 10);
+  return Number.isInteger(index) && index >= 0 ? index : 0;
+}
+
+function applySources(session, sources) {
+  if (!Array.isArray(sources)) return; // keep whatever the session already has
+  if (sources.length === 0) {
+    session.meta.imported = [];
+    return;
+  }
+  if (sources.length > MAX_IMPORTS) throw new Error(`At most ${MAX_IMPORTS} imported lessons are supported.`);
+  validateImportedFile({ lessons: sources }, builtinIds, session.meta.language || "en");
+  session.meta.imported = sources;
+}
+
+function importLessons(session) {
+  if (!Array.isArray(session.meta.imported) || session.meta.imported.length === 0) return [];
+  try {
+    return validateImportedFile({ lessons: session.meta.imported }, builtinIds, session.meta.language || "en");
+  } catch {
+    return [];
+  }
+}
+
+function resolveLessonByIndex(session, index) {
+  const idx = normalizeLessonIndex(index);
+  if (idx < builtinCount) return builtinLessons[idx];
+  return importLessons(session)[idx - builtinCount] || null;
+}
+
+function resolveLesson(session) {
+  const { lessonId } = session.meta;
+  if (builtinIds.has(lessonId)) return builtinLessons.find((lesson) => lesson.id === lessonId) || null;
+  return importLessons(session).find((lesson) => lesson.id === lessonId) || null;
+}
+
+function lessonClientIndex(session, lesson) {
+  if (!lesson) return normalizeLessonIndex(session.meta.lessonIndex);
+  if (builtinIds.has(lesson.id)) return builtinLessons.indexOf(lesson);
+  const importedIndex = importLessons(session).findIndex((item) => item.id === lesson.id);
+  return importedIndex === -1 ? builtinCount : builtinCount + importedIndex;
+}
+
+async function ensureSession(sessionId) {
+  if (sessionId) {
+    const existing = await loadSession(sessionId);
+    if (existing) return { session: existing, isNew: false };
+  }
+  const id = sessionId || crypto.randomUUID();
+  const dir = sessionDir(id);
+  await fsp.mkdir(dir, { recursive: true });
+  const session = {
+    id,
+    dir,
+    repoDir: path.join(dir, "repo"),
+    meta: freshMeta("builtin-01", 0, "en", []),
+    queue: Promise.resolve(),
+  };
+  sessions.set(id, session);
+  return { session, isNew: true };
+}
+
+async function loadSession(sessionId) {
+  if (sessions.has(sessionId)) return sessions.get(sessionId);
+  const dir = sessionDir(sessionId);
+  let raw;
+  try {
+    raw = await fsp.readFile(path.join(dir, "meta.json"), "utf8");
+  } catch {
+    return null;
+  }
+  let meta;
+  try {
+    meta = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  // Migrate the global git config from the old per-session home layout so
+  // existing sessions keep their configuration after the HOME change.
+  const legacyGitconfig = path.join(dir, "home", ".gitconfig");
+  if (fs.existsSync(legacyGitconfig) && !fs.existsSync(path.join(dir, ".gitconfig"))) {
+    try {
+      await fsp.rename(legacyGitconfig, path.join(dir, ".gitconfig"));
+    } catch {
+      // best effort
+    }
+  }
+  const session = {
+    id: sessionId,
+    dir,
+    repoDir: path.join(dir, "repo"),
+    meta: { ...freshMeta("builtin-01", 0, "en", []), ...meta },
+    queue: Promise.resolve(),
+  };
+  sessions.set(sessionId, session);
+  return session;
+}
+
+function enqueue(session, work) {
+  const run = session.queue.then(work, work);
+  session.queue = run.catch(() => {});
+  return run;
+}
+
+/* ------------------------------------------------------------------ */
+/* Seeding a real repository for a lesson                              */
+/* ------------------------------------------------------------------ */
+
+function commitSubject(commit, language) {
+  const message = commit.message;
+  if (typeof message === "string") return message;
+  return (message && (message[language] || message.en || message.hu)) || "Commit";
+}
+
+async function seed(session, lesson, language) {
+  const initial = lesson.initial || [{
+    id: "C0",
+    parents: [],
+    message: { hu: "Gyakorló repository", en: "Practice repository" },
+    lane: 0,
+  }];
+  const branches = lesson.branches || { main: initial.at(-1).id };
+  const current = lesson.current || Object.keys(branches)[0] || "main";
+
+  // Clear everything from the session directory except the persisted meta,
+  // including the repository, the session-level git config and any files the
+  // learner created at ~.
+  for (const entry of await fsp.readdir(session.dir)) {
+    if (entry === "meta.json") continue;
+    await fsp.rm(path.join(session.dir, entry), { recursive: true, force: true });
+  }
+  await fsp.mkdir(session.repoDir, { recursive: true });
+
+  session.meta = {
+    ...freshMeta(lesson.id, lessonClientIndex(session, lesson), language, session.meta.imported),
+    verifiedLessons: session.meta.verifiedLessons || [],
+  };
+
+  const init = await runGit(session, ["init", "--quiet"], { cwd: session.repoDir });
+  if (init.code !== 0) throw new Error(`git init failed: ${init.stderr || init.stdout}`);
+
+  // Build real commits with real content: every seeded commit adds its own
+  // file, so later merges, rebases and cherry-picks produce genuine diffs.
+  const emptyTree = await runGit(session, ["mktree"], { input: "" });
+  const baseTree = emptyTree.code === 0 && emptyTree.stdout.trim() ? emptyTree.stdout.trim() : EMPTY_TREE;
+
+  const treeById = {};
+  const idToSha = {};
+  for (let index = 0; index < initial.length; index += 1) {
+    const commit = initial[index];
+    const parent = (commit.parents || [])[0];
+    const readTree = parent
+      ? await runGit(session, ["read-tree", treeById[parent]])
+      : await runGit(session, ["read-tree", "--empty"]);
+    if (readTree.code !== 0) throw new Error(`git read-tree failed: ${readTree.stderr || readTree.stdout}`);
+
+    const subject = commitSubject(commit, language);
+    const blob = await runGit(session, ["hash-object", "-w", "--stdin"], { input: `${subject}\n` });
+    if (blob.code !== 0) throw new Error(`git hash-object failed: ${blob.stderr || blob.stdout}`);
+    const filePath = index === 0 ? "README.md" : `file-${index}.txt`;
+    const update = await runGit(session, ["update-index", "--add", "--cacheinfo", `100644,${blob.stdout.trim()},${filePath}`]);
+    if (update.code !== 0) throw new Error(`git update-index failed: ${update.stderr || update.stdout}`);
+    const tree = await runGit(session, ["write-tree"]);
+    if (tree.code !== 0) throw new Error(`git write-tree failed: ${tree.stderr || tree.stdout}`);
+    treeById[commit.id] = tree.stdout.trim();
+
+    const args = ["commit-tree", treeById[commit.id]];
+    for (const parentId of commit.parents || []) args.push("-p", idToSha[parentId]);
+    args.push("-m", subject);
+    const result = await runGit(session, args, { cwd: session.repoDir });
+    if (result.code !== 0) throw new Error(`git commit-tree failed: ${result.stderr || result.stdout}`);
+    idToSha[commit.id] = result.stdout.trim();
+  }
+
+  for (const [name, commitId] of Object.entries(branches)) {
+    const sha = idToSha[commitId];
+    if (!sha) throw new Error(`Lesson ${lesson.id}: branch ${name} points at unknown commit ${commitId}`);
+    const result = await runGit(session, ["update-ref", `refs/heads/${name}`, sha], { cwd: session.repoDir });
+    if (result.code !== 0) throw new Error(`git update-ref failed: ${result.stderr || result.stdout}`);
+  }
+
+  const head = await runGit(session, ["symbolic-ref", "HEAD", `refs/heads/${current}`], { cwd: session.repoDir });
+  if (head.code !== 0) throw new Error(`git symbolic-ref failed: ${head.stderr || head.stdout}`);
+
+  const checkout = await runGit(session, ["reset", "--hard", "--quiet"], { cwd: session.repoDir });
+  if (checkout.code !== 0) throw new Error(`git reset failed: ${checkout.stderr || checkout.stdout}`);
+
+  // Lessons that expect the learner to create commits start with one staged
+  // change so the documented `git commit -m ...` command works right away.
+  if (lesson.pendingChange) {
+    await fsp.writeFile(path.join(session.repoDir, "notes.txt"), "Pending change ready to be committed.\n");
+    const staged = await runGit(session, ["add", "notes.txt"], { cwd: session.repoDir });
+    if (staged.code !== 0) throw new Error(`git add failed: ${staged.stderr || staged.stdout}`);
+  }
+
+  // Tag every seeded commit with its lesson id so commands like
+  // `git cherry-pick C2` from the exercise text work against real git.
+  for (const [commitId, sha] of Object.entries(idToSha)) {
+    await runGit(session, ["tag", commitId, sha], { cwd: session.repoDir });
+  }
+
+  session.meta.idMap = Object.fromEntries(Object.entries(idToSha).map(([id, sha]) => [sha, id]));
+  session.meta.nextId = Math.max(0, ...initial.map((commit) => (
+    /^C\d+$/.test(commit.id) ? Number(commit.id.slice(1)) : 0
+  ))) + 1;
+  session.meta.cwd = "repo";
+  await saveMeta(session);
+}
+
+/* ------------------------------------------------------------------ */
+/* Real repository state -> the state shape used by the checks         */
+/* ------------------------------------------------------------------ */
+
+// `git config --list` lowercases variable names, but the exercise checks use
+// the canonical spelling (`init.defaultBranch`). Recover the original case
+// from the config files themselves while keeping git's authoritative values.
+function configCaseMap(files) {
+  const map = new Map();
+  for (const file of files) {
+    let content;
+    try {
+      content = fs.readFileSync(file, "utf8");
+    } catch {
+      continue;
+    }
+    let section = null;
+    for (const rawLine of content.split("\n")) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#") || line.startsWith(";")) continue;
+      const sectionMatch = /^\[([^\]]+)\]$/.exec(line);
+      if (sectionMatch) {
+        const parts = sectionMatch[1].split(" ");
+        const name = parts[0].toLowerCase();
+        const subsection = parts.slice(1).join(" ").replace(/^"|"$/g, "");
+        section = subsection ? `${name}.${subsection}` : name;
+        continue;
+      }
+      const eq = line.indexOf("=");
+      if (eq > 0 && section) {
+        const key = `${section}.${line.slice(0, eq).trim()}`;
+        map.set(key.toLowerCase(), key);
+      }
+    }
+  }
+  return map;
+}
+
+function parseConfigList(output, caseMap) {
+  const config = {};
+  for (const line of output.split("\n")) {
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq);
+    config[caseMap.get(key.toLowerCase()) || key] = line.slice(eq + 1);
+  }
+  return config;
+}
+
+function computeLanes(commits, branchTips, current, detached) {
+  const byId = new Map(commits.map((commit) => [commit.id, commit]));
+  const laneOf = new Map();
+
+  const ordered = [];
+  if (branchTips.main !== undefined) ordered.push(branchTips.main);
+  for (const [name, tip] of Object.entries(branchTips)) {
+    if (name !== "main" && !ordered.includes(tip)) ordered.push(tip);
+  }
+  if (current && branchTips[current] !== undefined && !ordered.includes(branchTips[current])) {
+    ordered.unshift(branchTips[current]);
+  }
+  if (current === null && detached) ordered.unshift(detached);
+
+  let nextLane = 0;
+  for (const tip of ordered) {
+    let cursor = tip;
+    const chain = [];
+    while (cursor !== undefined && !laneOf.has(cursor)) {
+      chain.push(cursor);
+      const commit = byId.get(cursor);
+      if (!commit) break;
+      cursor = commit.parents[0];
+    }
+    for (const id of chain) if (!laneOf.has(id)) laneOf.set(id, nextLane);
+    nextLane += 1;
+  }
+
+  // Anything not reached through a branch's first-parent chain inherits its
+  // first parent's lane, falling back to lane 0.
+  for (const commit of commits) {
+    if (laneOf.has(commit.id)) continue;
+    const parentLane = commit.parents.map((id) => laneOf.get(id)).find((value) => value !== undefined);
+    laneOf.set(commit.id, parentLane ?? 0);
+  }
+  return laneOf;
+}
+
+async function buildState(session) {
+  const meta = session.meta;
+
+  const log = await runGit(session, ["log", "--all", "--topo-order", "--reverse", "--format=%H%x1f%P%x1f%s"]);
+  const commits = [];
+  if (log.code === 0) {
+    for (const line of log.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [sha, parentsRaw, ...subjectParts] = line.split("\x1f");
+      const subject = subjectParts.join("\x1f");
+      if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
+      const parents = (parentsRaw || "").split(" ").filter(Boolean).map((parentSha) => {
+        if (!meta.idMap[parentSha]) meta.idMap[parentSha] = `C${meta.nextId++}`;
+        return meta.idMap[parentSha];
+      });
+      commits.push({ id: meta.idMap[sha], sha, parents, message: subject, lane: 0 });
+    }
+  }
+
+  const refs = await runGit(session, ["for-each-ref", "refs/heads", "--format=%(refname:short)\x1f%(objectname)"]);
+  const branches = {};
+  const branchTips = {};
+  if (refs.code === 0) {
+    for (const line of refs.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [name, sha] = line.split("\x1f");
+      if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
+      branches[name] = meta.idMap[sha];
+      branchTips[name] = meta.idMap[sha];
+    }
+  }
+
+  let current = null;
+  let detached = null;
+  const symbolic = await runGit(session, ["symbolic-ref", "-q", "--short", "HEAD"]);
+  if (symbolic.code === 0) {
+    current = symbolic.stdout.trim() || null;
+  } else {
+    const head = await runGit(session, ["rev-parse", "-q", "--verify", "HEAD"]);
+    if (head.code === 0) {
+      const sha = head.stdout.trim();
+      if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
+      detached = meta.idMap[sha];
+    }
+  }
+
+  const localConfig = await runGit(session, ["config", "--list", "--local"]);
+  const globalConfig = await runGit(session, ["config", "--list", "--global"]);
+  const localCase = configCaseMap([path.join(session.repoDir, ".git", "config")]);
+  const globalCase = configCaseMap([
+    path.join(session.dir, ".gitconfig"),
+    path.join(session.dir, ".config", "git", "config"),
+  ]);
+
+  const remotes = {};
+  const remoteList = await runGit(session, ["remote", "-v"]);
+  if (remoteList.code === 0) {
+    for (const line of remoteList.stdout.split("\n")) {
+      const match = /^(\S+)\s+(\S+)\s+\((?:fetch|push)\)/.exec(line.trim());
+      if (match && !(match[1] in remotes)) remotes[match[1]] = match[2];
+    }
+  }
+
+  const status = await runGit(session, ["status", "--porcelain"]);
+  const dirty = status.code === 0
+    ? status.stdout.split("\n").filter((line) => line.trim()).length
+    : 0;
+
+  const laneOf = computeLanes(commits, branchTips, current, detached);
+  const lesson = resolveLesson(session);
+  const initialById = new Map((lesson?.initial || []).map((commit) => [commit.id, commit]));
+  for (const commit of commits) {
+    commit.lane = laneOf.get(commit.id) ?? 0;
+    const seeded = initialById.get(commit.id);
+    if (seeded && typeof seeded.message === "object") commit.translations = { ...seeded.message };
+  }
+
+  return {
+    commits,
+    branches,
+    current,
+    detached,
+    config: {
+      local: parseConfigList(localConfig.code === 0 ? localConfig.stdout : "", localCase),
+      global: parseConfigList(globalConfig.code === 0 ? globalConfig.stdout : "", globalCase),
+    },
+    remotes,
+    meta: {
+      source: "docker-container",
+      container: SHELL_HOST,
+      user: SHELL_USER,
+      host: SHELL_HOST,
+      dirty,
+      cwd: meta.cwd,
+      verifiedLessons: [...meta.verifiedLessons],
+      recentExecutions: [...meta.execLog].slice(-6).reverse(),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Task verification (server side)                                     */
+/* ------------------------------------------------------------------ */
+
+function verify(session, state) {
+  const meta = session.meta;
+  const lesson = resolveLesson(session);
+  if (!lesson) {
+    return {
+      lessonId: meta.lessonId,
+      verified: false,
+      checkPassed: false,
+      realGitCommands: meta.gitSuccessSinceSeed,
+      source: "container-git",
+      reason: "unknown-lesson",
+    };
+  }
+  const isExercise = (lesson.type || "exercise") === "exercise";
+  const checkPassed = isExercise ? Boolean(lesson.check(state)) : true;
+  const realGitCommands = meta.gitSuccessSinceSeed;
+  const verified = isExercise ? checkPassed && realGitCommands >= 1 : true;
+
+  if (isExercise) {
+    const position = meta.verifiedLessons.indexOf(lesson.id);
+    if (verified && position === -1) meta.verifiedLessons.push(lesson.id);
+    if (!verified && position !== -1) meta.verifiedLessons.splice(position, 1);
+  }
+
+  return {
+    lessonId: lesson.id,
+    type: isExercise ? "exercise" : "reading",
+    checkPassed,
+    realGitCommands,
+    verified,
+    source: "container-git",
+  };
+}
+
+function attachVerification(session, state) {
+  const verification = verify(session, state);
+  state.meta.verification = verification;
+  state.meta.verifiedLessons = [...session.meta.verifiedLessons];
+  return verification;
+}
+
+async function snapshot(session) {
+  await syncTags(session);
+  const state = await buildState(session);
+  const verification = attachVerification(session, state);
+  await saveMeta(session);
+  return { state, verification };
+}
+
+/* ------------------------------------------------------------------ */
+/* Command execution inside the container                              */
+/* ------------------------------------------------------------------ */
+
+function tokenize(command) {
+  const tokens = [];
+  const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let match;
+  while ((match = pattern.exec(command)) !== null) {
+    tokens.push(match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[3]);
+  }
+  return tokens;
+}
+
+function isInside(root, target) {
+  const resolvedRoot = path.resolve(root);
+  const resolvedTarget = path.resolve(target);
+  return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`);
+}
+
+function sessionCwd(session) {
+  const candidate = path.resolve(session.dir, session.meta.cwd || "repo");
+  return isInside(session.dir, candidate) ? candidate : session.repoDir;
+}
+
+async function identFallback(session) {
+  // Real git refuses to commit without an identity. Provide a fallback via
+  // environment only when the session has not configured one, so `git config`
+  // lessons still start from an empty configuration.
+  const result = await runGit(session, ["config", "user.email"]);
+  return result.code === 0 ? {} : identityEnv();
+}
+
+function recordExecution(session, entry) {
+  session.meta.execLog.push({ ...entry, at: new Date().toISOString(), real: true });
+  if (session.meta.execLog.length > 100) session.meta.execLog = session.meta.execLog.slice(-100);
+  session.meta.execSinceSeed += 1;
+  if (entry.program === "git" && entry.exitCode === 0) session.meta.gitSuccessSinceSeed += 1;
+}
+
+async function executeSegment(session, tokens, outputs) {
+  let redirect = null;
+  const redirectIndex = tokens.findIndex((token) => token === ">" || token === ">>");
+  if (redirectIndex !== -1) {
+    if (tokens.length !== redirectIndex + 2 || !tokens[redirectIndex + 1]) {
+      return { code: "not-allowed", program: null };
+    }
+    redirect = { append: tokens[redirectIndex] === ">>", target: tokens[redirectIndex + 1] };
+    tokens = tokens.slice(0, redirectIndex);
+  }
+  if (!tokens.length) return { code: null, exitCode: 0 };
+
+  const program = tokens[0];
+  const args = tokens.slice(1);
+  const cwd = sessionCwd(session);
+  const recordCommand = [...tokens, redirect ? (redirect.append ? ">>" : ">") : null, redirect ? redirect.target : null]
+    .filter(Boolean).join(" ");
+
+  if (program === "cd") {
+    const target = path.resolve(cwd, args[0] || session.dir);
+    let stat = null;
+    if (isInside(session.dir, target)) {
+      try {
+        stat = await fsp.stat(target);
+      } catch {
+        stat = null;
+      }
+    }
+    const ok = Boolean(stat && stat.isDirectory());
+    if (ok) session.meta.cwd = path.relative(session.dir, target) || ".";
+    else outputs.push(`cd: ${args[0] || target}: ${isInside(session.dir, target) ? "No such file or directory" : "outside of the sandbox"}\n`);
+    recordExecution(session, { command: ["cd", ...args].join(" "), program: "cd", exitCode: ok ? 0 : 1, spawned: false });
+    return { code: null, exitCode: ok ? 0 : 1 };
+  }
+
+  if (!ALLOWED_COMMANDS.has(program)) {
+    return { code: "not-allowed", program };
+  }
+
+  let stdoutFile = null;
+  if (redirect) {
+    stdoutFile = path.resolve(cwd, redirect.target);
+    if (!isInside(session.dir, stdoutFile)) {
+      outputs.push(`${redirect.target}: outside of the sandbox\n`);
+      recordExecution(session, { command: recordCommand, program, exitCode: 1, spawned: false });
+      return { code: null, exitCode: 1 };
+    }
+    try {
+      await fsp.access(path.dirname(stdoutFile));
+    } catch {
+      outputs.push(`${redirect.target}: No such file or directory\n`);
+      recordExecution(session, { command: recordCommand, program, exitCode: 1, spawned: false });
+      return { code: null, exitCode: 1 };
+    }
+  }
+
+  const env = { ...baseEnv(session) };
+  if (program === "git") Object.assign(env, await identFallback(session));
+
+  const result = await runProcess(program, args, {
+    cwd,
+    env,
+    stdoutFile,
+    append: redirect ? redirect.append : undefined,
+  });
+
+  recordExecution(session, {
+    command: recordCommand,
+    program,
+    exitCode: result.code,
+    spawned: true,
+    pid: result.pid,
+  });
+
+  if (!stdoutFile) {
+    let text = result.stdout;
+    if (result.stderr) text += `${text ? "\n" : ""}${result.stderr}`;
+    if (text) outputs.push(text.endsWith("\n") ? text : `${text}\n`);
+  }
+  return { code: null, exitCode: result.code };
+}
+
+async function executeInSession(session, command) {
+  const outputs = [];
+  let notAllowed = null;
+  let lastExit = 0;
+
+  const segments = [];
+  let currentSegment = [];
+  for (const token of tokenize(command)) {
+    if (token === "&&") {
+      if (currentSegment.length) segments.push(currentSegment);
+      currentSegment = [];
+    } else {
+      currentSegment.push(token);
+    }
+  }
+  if (currentSegment.length) segments.push(currentSegment);
+
+  for (const tokens of segments) {
+    const result = await executeSegment(session, tokens, outputs);
+    if (result.code === "not-allowed") {
+      notAllowed = result.program || null;
+      lastExit = 127;
+      break;
+    }
+    lastExit = result.exitCode;
+    if (result.exitCode !== 0) break; // `&&` semantics: stop at the first failure
+  }
+
+  await saveMeta(session);
+  return {
+    output: outputs.join(""),
+    error: lastExit !== 0,
+    notAllowed,
+    exitCode: lastExit,
+    execution: session.meta.execLog.at(-1) || null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Keep lesson-id tags in sync with the real repository                */
+/* ------------------------------------------------------------------ */
+
+async function syncTags(session) {
+  const meta = session.meta;
+  const idSet = new Set(Object.values(meta.idMap));
+  if (idSet.size === 0) return;
+
+  const live = new Set();
+  const branchesRev = await runGit(session, ["rev-list", "--branches"]);
+  if (branchesRev.code === 0) {
+    for (const sha of branchesRev.stdout.split("\n")) if (sha.trim()) live.add(sha.trim());
+  }
+  const headRev = await runGit(session, ["rev-list", "HEAD"]);
+  if (headRev.code === 0) {
+    for (const sha of headRev.stdout.split("\n")) if (sha.trim()) live.add(sha.trim());
+  }
+
+  const tags = await runGit(session, ["for-each-ref", "refs/tags", "--format=%(refname:short)\x1f%(objectname)"]);
+  const existingTags = new Map();
+  if (tags.code === 0) {
+    for (const line of tags.stdout.split("\n")) {
+      if (!line.trim()) continue;
+      const [name, sha] = line.split("\x1f");
+      existingTags.set(name, sha);
+    }
+  }
+
+  // Drop lesson-id tags for commits that no longer exist in the real history
+  // (for example after a rebase or reset), so the state cannot go stale.
+  for (const [name, sha] of [...existingTags]) {
+    if (idSet.has(name) && !live.has(sha)) {
+      await runGit(session, ["tag", "-d", name]);
+      existingTags.delete(name);
+    }
+  }
+
+  const ordered = await runGit(session, ["log", "--all", "--topo-order", "--reverse", "--format=%H"]);
+  if (ordered.code === 0) {
+    for (const sha of ordered.stdout.split("\n")) {
+      if (sha.trim() && !meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
+    }
+  }
+
+  for (const [sha, id] of Object.entries(meta.idMap)) {
+    if (!live.has(sha) || existingTags.has(id)) continue;
+    await runGit(session, ["tag", id, sha]);
+  }
+  await saveMeta(session);
+}
+
+/* ------------------------------------------------------------------ */
+/* HTTP layer                                                          */
+/* ------------------------------------------------------------------ */
+
+const STATIC_FILES = {
+  "/": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/index.html": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
+  "/style.css": { file: "style.css", type: "text/css; charset=utf-8" },
+  "/shared/lessons.js": { file: "shared/lessons.js", type: "text/javascript; charset=utf-8" },
+};
+
+function sendJson(res, status, payload) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error("Request body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (!chunks.length) return resolve({});
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+async function serveStatic(res, urlPath) {
+  const entry = STATIC_FILES[urlPath];
+  if (!entry) {
+    sendJson(res, 404, { error: "Not found" });
+    return;
+  }
+  try {
+    const content = await fsp.readFile(path.join(ROOT, entry.file));
+    res.writeHead(200, {
+      "Content-Type": entry.type,
+      "Cache-Control": "no-cache",
+      "X-Content-Type-Options": "nosniff",
+    });
+    res.end(content);
+  } catch {
+    sendJson(res, 500, { error: "Static file unavailable" });
+  }
+}
+
+function httpError(status, code, message) {
+  return Object.assign(new Error(message), { status, code });
+}
+
+async function requireSession(payload) {
+  const sessionId = payload && typeof payload.sessionId === "string" ? payload.sessionId : "";
+  if (!SESSION_ID_RE.test(sessionId)) throw httpError(400, "no-session", "Unknown session");
+  const session = await loadSession(sessionId);
+  if (!session) throw httpError(400, "no-session", "Unknown session");
+  return session;
+}
+
+/* ------------------------------------------------------------------ */
+/* Request handlers                                                    */
+/* ------------------------------------------------------------------ */
+
+async function handleSessionCreate(payload) {
+  const language = normalizeLanguage(payload.language);
+  const requestedId = typeof payload.sessionId === "string" && SESSION_ID_RE.test(payload.sessionId)
+    ? payload.sessionId
+    : null;
+  const { session, isNew } = await ensureSession(requestedId);
+
+  await enqueue(session, async () => {
+    if (isNew) {
+      applySources(session, payload.sources);
+      session.meta.language = language;
+      const lesson = resolveLessonByIndex(session, payload.lessonIndexHint) || builtinLessons[0];
+      await seed(session, lesson, language);
+    } else {
+      applySources(session, payload.sources);
+      session.meta.language = language;
+      await saveMeta(session);
+    }
+  });
+
+  return enqueue(session, async () => {
+    const lesson = resolveLesson(session)
+      || resolveLessonByIndex(session, session.meta.lessonIndex)
+      || builtinLessons[0];
+    const { state } = await snapshot(session);
+    return {
+      sessionId: session.id,
+      lessonId: lesson.id,
+      lessonIndex: lessonClientIndex(session, lesson),
+      verifiedLessons: [...session.meta.verifiedLessons],
+      importedSources: session.meta.imported || [],
+      state,
+    };
+  });
+}
+
+async function handleLesson(session, payload) {
+  const language = normalizeLanguage(payload.language);
+  session.meta.language = language;
+  applySources(session, payload.sources);
+
+  let lesson = null;
+  if (typeof payload.lessonId === "string" && payload.lessonId) {
+    if (builtinIds.has(payload.lessonId)) lesson = builtinLessons.find((item) => item.id === payload.lessonId);
+    else lesson = importLessons(session).find((item) => item.id === payload.lessonId) || null;
+  }
+  if (!lesson) lesson = resolveLessonByIndex(session, payload.lessonIndex);
+  if (!lesson) throw httpError(400, "unknown-lesson", "Unknown lesson");
+
+  if (payload.clearProgress) session.meta.verifiedLessons = [];
+  await seed(session, lesson, language);
+  const { state, verification } = await snapshot(session);
+  return {
+    lessonId: lesson.id,
+    lessonIndex: lessonClientIndex(session, lesson),
+    verifiedLessons: [...session.meta.verifiedLessons],
+    state,
+    verification,
+  };
+}
+
+async function handleCommand(session, payload) {
+  const command = typeof payload.command === "string" ? payload.command.trim() : "";
+  if (!command) throw httpError(400, "empty-command", "Empty command");
+  if (payload.language) session.meta.language = normalizeLanguage(payload.language);
+
+  if (command.length > MAX_COMMAND_LENGTH) {
+    const { state } = await snapshot(session);
+    return { output: "", error: true, code: "not-allowed", execution: null, state };
+  }
+
+  const executed = await executeInSession(session, command);
+  const { state, verification } = await snapshot(session);
+
+  return {
+    output: executed.output,
+    error: Boolean(executed.error),
+    code: executed.notAllowed ? "not-allowed" : null,
+    execution: executed.execution,
+    state,
+    verification,
+    verifiedLessons: [...session.meta.verifiedLessons],
+  };
+}
+
+async function handleVerify(session, payload) {
+  if (payload.language) session.meta.language = normalizeLanguage(payload.language);
+  const { state, verification } = await snapshot(session);
+  return {
+    state,
+    verification,
+    verifiedLessons: [...session.meta.verifiedLessons],
+  };
+}
+
+async function handleHealth() {
+  const version = await fsp.readFile(path.join(ROOT, "server", "package.json"), "utf8")
+    .then((raw) => JSON.parse(raw).version)
+    .catch(() => "unknown");
+  const gitVersion = await runProcess("git", ["--version"], { cwd: ROOT, env: { PATH: process.env.PATH } });
+  return {
+    ok: true,
+    version,
+    git: (gitVersion.stdout || "").trim(),
+    container: os.hostname(),
+    workspace: WORKSPACE,
+  };
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  try {
+    if (req.method === "GET" && url.pathname === "/api/health") {
+      sendJson(res, 200, await handleHealth());
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/session") {
+      sendJson(res, 200, await handleSessionCreate(await readJson(req)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/lesson") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleLesson(session, payload)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/command") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleCommand(session, payload)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/verify") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleVerify(session, payload)));
+      return;
+    }
+    if (req.method === "GET") {
+      await serveStatic(res, url.pathname);
+      return;
+    }
+    sendJson(res, 404, { error: "Not found" });
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message, code: error.code || "server-error" });
+  }
+});
+
+fsp.mkdir(SESSIONS_DIR, { recursive: true })
+  .then(() => {
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Git Workshop server listening on port ${PORT}`);
+      console.log(`Workspace: ${WORKSPACE}`);
+      console.log(`Container: ${os.hostname()}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Failed to prepare workspace:", error);
+    process.exit(1);
+  });

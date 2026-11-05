@@ -1,0 +1,20 @@
+services:
+  git-workshop:
+    build: .
+    container_name: git-workshop
+    hostname: git-workshop
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - git-workshop-data:/workspace
+    init: true
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  git-workshop-data:

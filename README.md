@@ -1,6 +1,6 @@
 # Git Workshop / Git műhely
 
-A dependency-free, bilingual Git learning environment. Use the language button in the header to switch between English and Hungarian. The commit graph and command line run in the browser; no Git installation, server, or internet connection is needed. The lessons are original, step-by-step exercises for learning branches and commits.
+A bilingual Git learning environment that runs entirely in a local Docker container. Use the language button in the header to switch between English and Hungarian. The web interface is served from the container, and every command typed into the terminal is executed as a real command inside the container — nothing is simulated. The lessons are original, step-by-step exercises for learning branches and commits.
 
 ## Release 0.0.3
 
@@ -8,46 +8,42 @@ The application release version is `0.0.3`. The header and footer version labels
 
 ## Screenshots
 
-![Git Workshop lesson and simulator](./screenshots/overview.png)
+![Git Workshop lesson and terminal](./screenshots/overview.png)
 
 ![Git Workshop merge graph and terminal](./screenshots/merge-workflow.png)
 
 ## Getting started
 
-Open `index.html` in a modern browser. Lessons, repository state, and the command simulator run entirely in the browser.
+Requirements: Docker Engine or Docker Desktop with the Compose plugin, and an internet connection for the initial image build.
 
-## Local Docker playground
-
-The **Docker playground** button opens instructions for an optional real Linux terminal. It runs locally in an isolated Alpine container; no project files or Docker socket are mounted. The terminal is exposed only on `127.0.0.1:7681`, is password-protected with a random password printed in the container logs, and the container has memory, CPU, and process limits. The container starts without Git so you can practice installing it.
-
-Requirements: Docker Engine or Docker Desktop with the Compose plugin, and an internet connection to download the container image and install packages.
-
-From the repository root, start the sandbox:
+From the repository root, build and start the environment:
 
 ```sh
-docker compose -f docker-compose.playground.yml up --build -d
-docker compose -f docker-compose.playground.yml logs git-playground
+docker compose up --build -d
 ```
 
-Copy the printed password, click **Open terminal** in the app, and sign in as `git`. In the shell, install Git and try it:
+Then open <http://localhost:3000> in a modern browser. The web interface, the commit graph, and the terminal all run inside the `git-workshop` container. The port is bound to `127.0.0.1`, so the app is reachable only from your own machine.
+
+## Real commands, verified exercises
+
+The Node server inside the container executes every terminal command with the real `git` binary in a per-session repository under `/workspace`. After each command the server reads the real repository state — branches, commits, configuration, remotes, working-tree status — and rebuilds the commit graph from it.
+
+Exercises are verified **on the server against that real repository state**. A task counts as completed only when the container's repository actually satisfies the check *and* at least one real `git` command was executed in the container since the exercise was loaded, as recorded in the server's execution log. Nothing is checked in the browser, so a simulated command cannot complete a task.
+
+Seeded lesson commits are tagged with their exercise ids (`C0`, `C1`, …), which means commands from the lesson text such as `git cherry-pick C2` work against real git.
+
+The terminal header has two extra controls. **Check task** re-runs the server-side verification on demand: it reports the evidence (real repository state plus the number of real `git` commands executed since the lesson loaded), marks the current exercise complete when it passes, and on the next press advances to the next task. **Hint** reveals the current exercise step by step in the terminal — first the goal, then the tip, and finally the exact commands to run in the container.
+
+The terminal shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around.
+
+## Stopping and resetting
 
 ```sh
-apk add git
-git --version
-git config --global user.name "Learner"
-git config --global user.email "learner@example.test"
-mkdir first-repo && cd first-repo
-git init
-echo "# First repo" > README.md
-git add README.md
-git commit -m "Initial commit"
+docker compose down      # stop the container, keep practice repositories
+docker compose down -v   # stop and delete the practice data volume
 ```
 
-The named `/workspace` volume retains practice files across container restarts. To stop the sandbox and permanently delete that volume and its contents:
-
-```sh
-docker compose -f docker-compose.playground.yml down -v
-```
+The named `git-workshop-data` volume keeps each session's repositories across container restarts. **Restart** rebuilds the current exercise's repository inside the container; **Progress → Clear Progress** also resets the recorded completions.
 
 ## Contact and contributions
 
@@ -72,11 +68,11 @@ The app contains 43 command-checked exercises plus guided concept lessons. The b
 13. Responding to an exposed credential.
 14. Branching strategies for multiple teams and continuous delivery.
 
-Concept lessons can be completed with **Next lesson**. Commit, branch, merge, rebase, and cherry-pick exercises use the interactive graph and command simulator.
+Concept lessons can be completed with **Next lesson**. Commit, branch, merge, rebase, and cherry-pick exercises use the interactive graph and the container-backed terminal; their completion is verified against the real repository state.
 
 ## Importing exercises
 
-Select **Import** and choose a `.json`, `.yaml`, or `.yml` file. Imported exercises are appended to the learning path and saved in this browser's local storage. Importing the same ID twice is rejected. The app accepts up to 200 imported exercises and 1 MB per file. Use **Restart** to reset the active exercise or **Remove** beside the import status to remove all imported exercises.
+Select **Import** and choose a `.json`, `.yaml`, or `.yml` file. Imported exercises are appended to the learning path, saved in this browser's local storage, and synced to the container so their checks can be verified server-side too. Importing the same ID twice is rejected. The app accepts up to 200 imported exercises and 1 MB per file. Use **Restart** to reset the active exercise or **Remove** beside the import status to remove all imported exercises.
 
 See [`custom-exercises.json`](./custom-exercises.json) and [`custom-exercises.yaml`](./custom-exercises.yaml) for ready-to-import examples. Both formats use a top-level `lessons` array. Every item requires a unique `id`, localized `title`, `description`, `goal`, and `hint`; localized strings may be a single string (same text in both languages) or an object with `hu` and `en` strings. `category`, `initial`, `branches`, and `current` are optional.
 
@@ -94,20 +90,16 @@ In a goal string, wrap values learners must supply in `[[double brackets]]` to h
 
 The YAML importer supports ordinary indented mappings/lists, quoted and plain scalars, comments, and `|`/`>` block strings. Tabs, anchors, tags, and other advanced YAML features are not supported. The importer validates files before adding them and reports errors in the interface.
 
-## Simulator commands
+## Terminal commands
 
-- `git status`
-- `git config [--global|--local] <key> <value>`
-- `git config [--global|--local] --get <key>` and `git config --list`
-- `git remote add <name> <url>`, `git remote -v`, `git remote set-url <name> <url>`
-- `git commit -m "message"`
-- `git branch <branch-name>`
-- `git switch <branch-name>`, `git switch -c <branch-name>`, and `git checkout <branch-name>`
-- `git merge <branch-name>`
-- `git rebase <branch-name>`
-- `git cherry-pick <commit-id>`
-- `git log`
-- `undo` — restore the previous state
-- `help`
+The terminal runs in the container and accepts real programs from a fixed allowlist:
 
-The app is an educational command simulator, not a replacement for the Git command-line tool. Configuration and remote commands update only the simulated repository state; they do not change your computer's Git configuration or connect to a real remote. Commands such as `clone`, `fetch`, `pull`, `reset`, `revert`, and `restore` are explained in the lessons but are not executed by the simulator. Exercise progress resets when a lesson is restarted or the page is refreshed; imported lesson definitions remain saved in local storage.
+- `git …` — unrestricted real git: `status`, `log`, `config`, `remote`, `commit`, `branch`, `switch`, `merge`, `rebase`, `cherry-pick`, `clone`, `fetch`, `pull`, `reset`, `revert`, `restore`, and everything else git supports
+- file helpers: `ls`, `pwd`, `cat`, `echo`, `mkdir`, `touch`, `rm`, `cp`, `mv`, `head`, `tail`, `wc`, `grep`, `stat`, `find`, `date`, `whoami`, `uname`, …
+- `cd <directory>` — move inside your session workspace
+- `clear` — clear the terminal output, `help` — list the common commands
+- output redirection (`echo text > file.txt`, `>>`) and chaining with `&&`
+
+Anything else (for example `bash` or `node`) is rejected with an error. The container is the sandbox: no host files and no Docker socket are mounted, the process runs as an unprivileged user, and the compose file applies memory, CPU, process, and capability limits. Git commands that need the network (`clone`, `fetch`, `pull`) run from inside the container, so a bad URL simply fails with git's own error message.
+
+Configuration changes, remotes, and commits live in the session repository inside the container — they never touch your host machine's git configuration. Exercise progress (current lesson and verified tasks) is stored in the container volume and mirrored to your browser.

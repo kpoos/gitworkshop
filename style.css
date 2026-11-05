@@ -231,6 +231,9 @@ h1 { margin: 17px 0 10px; font-size: clamp(24px, 2.2vw, 31px); letter-spacing: -
 .terminal-icon { color: var(--accent); font-family: var(--mono); font-size: 13px; }
 .text-button { padding: 4px 0; border: 0; background: transparent; color: var(--blue); cursor: pointer; font-size: 10px; }
 .text-button:hover { color: #b0d5ff; }
+.terminal-actions .button { padding: 8px 11px; font-size: 11px; }
+.terminal-actions .verify-button { background: #8ff0d0; color: #0d2b23; box-shadow: 0 0 10px rgba(118, 227, 189, .4); }
+.terminal-actions .verify-button:hover:not(:disabled) { background: #b6ffe8; box-shadow: 0 0 16px rgba(118, 227, 189, .6); }
 .terminal-output { flex: 1; min-height: 105px; overflow: auto; padding: 11px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.65; scrollbar-color: #344250 transparent; }
 .output-line { white-space: pre-wrap; overflow-wrap: anywhere; }
 .output-command { color: #c4d2df; }
