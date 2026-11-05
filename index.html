@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#10151c">
-    <meta name="application-version" content="0.0.3">
+    <meta name="application-version" content="0.0.4">
     <title>Git műhely — tanulj gyakorlással</title>
     <link rel="stylesheet" href="style.css">
   </head>
@@ -14,7 +14,7 @@
         <span class="brand-mark" aria-hidden="true">⌘</span>
         <span>git<span class="brand-accent" id="brand-name">műhely</span></span>
       </a>
-      <span class="version-badge" id="version-badge">v0.0.3</span>
+      <span class="version-badge" id="version-badge">v0.0.4</span>
       <div class="topbar-note"><span class="live-dot"></span><span id="offline-note">Helyben fut · nincs szükség internetre</span></div>
       <div class="topbar-actions">
         <button class="button button-quiet" id="import-button" type="button" aria-label="Feladatfájl importálása">Import</button>
@@ -39,7 +39,7 @@
           <button class="text-button" id="clear-imported" type="button" hidden>Eltávolítás</button>
         </div>
         <footer class="sidebar-footer">
-          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.3</span></span></div>
+          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.4</span></span></div>
           <a href="https://github.com/kpoos/gitworkshop" target="_blank" rel="noopener noreferrer">github.com/kpoos/gitworkshop</a>
         </footer>
       </aside>
@@ -84,17 +84,19 @@
           <div class="terminal-heading">
             <div class="terminal-title"><span class="terminal-icon" aria-hidden="true">›_</span><h2 id="terminal-title">Parancssor</h2></div>
             <div class="terminal-actions">
-              <button class="text-button" id="docker-playground-button" type="button">Dockeres játszótér</button>
-              <button class="text-button" id="help-button" type="button">Parancsok</button>
+              <button class="button button-primary verify-button" id="verify-button" type="button" disabled>Feladat ellenőrzése</button>
+              <button class="button button-secondary" id="hint-button" type="button" disabled>Súgás</button>
+              <button class="button button-secondary" id="docker-playground-button" type="button">Docker környezet</button>
+              <button class="button button-secondary" id="help-button" type="button">Parancsok</button>
             </div>
           </div>
           <div class="terminal-output" id="terminal-output" role="log" aria-live="polite" aria-label="Parancssori kimenet"></div>
           <form class="command-form" id="command-form" autocomplete="off">
-            <label for="command-input" class="prompt" id="terminal-prompt">main ❯</label>
-            <input id="command-input" name="command" type="text" spellcheck="false" autocapitalize="off" placeholder="git commit -m &quot;Első változtatás&quot;" aria-label="Git parancs">
+            <label for="command-input" class="prompt" id="terminal-prompt">$</label>
+            <input id="command-input" name="command" type="text" disabled spellcheck="false" autocapitalize="off" placeholder="git commit -m &quot;Első változtatás&quot;" aria-label="Git parancs">
             <button class="run-button" id="run-command" type="submit" aria-label="Parancs futtatása">↵</button>
           </form>
-          <div class="terminal-hint"><span id="terminal-hint">Nyomj</span> <kbd>Enter</kbd><span id="run-hint">-t a futtatáshoz</span> <span>·</span> <kbd>↑</kbd> <span id="history-hint">előző parancs</span></div>
+          <div class="terminal-hint"><span id="terminal-hint">Nyomj</span> <kbd>Enter</kbd><span id="run-hint">-t a futtatáshoz</span> <span>·</span> <kbd>↑</kbd> <span id="history-hint">előző parancs</span> <span>·</span> <kbd>Tab</kbd> <span id="completion-hint">kiegészítés</span></div>
         </div>
       </section>
     </main>
@@ -108,26 +110,22 @@
       </div>
       <p class="docker-dialog-intro" id="docker-dialog-intro"></p>
       <ol class="docker-steps">
-        <li><span id="docker-step-one"></span><pre><code>docker compose -f docker-compose.playground.yml up --build -d</code></pre></li>
-        <li><span id="docker-step-two"></span><pre><code>docker compose -f docker-compose.playground.yml logs git-playground</code></pre></li>
+        <li><span id="docker-step-one"></span><pre><code>docker compose up --build -d</code></pre></li>
+        <li><span id="docker-step-two"></span><pre><code>http://localhost:3000</code></pre></li>
         <li><span id="docker-step-three"></span></li>
       </ol>
       <div class="docker-dialog-example">
         <strong id="docker-example-title"></strong>
-        <pre><code>apk add git
-git --version
-git config --global user.name "Learner"
-git config --global user.email "learner@example.test"
-mkdir first-repo && cd first-repo
-git init
-echo "# First repo" > README.md
+        <pre><code>git config --global user.name "Learner"
+git switch -c feature/search
+echo "new line" >> README.md
 git add README.md
-git commit -m "Initial commit"</code></pre>
+git commit -m "Add change"
+git log --oneline</code></pre>
       </div>
-      <p class="docker-dialog-reset"><span id="docker-reset-copy"></span> <code>docker compose -f docker-compose.playground.yml down -v</code></p>
+      <p class="docker-dialog-reset"><span id="docker-reset-copy"></span> <code>docker compose down -v</code></p>
       <div class="docker-dialog-actions">
-        <a class="button button-primary" id="docker-terminal-link" href="http://127.0.0.1:7681/" target="_blank" rel="noopener noreferrer"></a>
-        <button class="button button-secondary" id="docker-dialog-done" type="button"></button>
+        <button class="button button-primary" id="docker-dialog-done" type="button"></button>
       </div>
     </dialog>
 
@@ -142,37 +140,7 @@ git commit -m "Initial commit"</code></pre>
         <button class="button button-primary" id="progress-close" type="button">Bezárás</button>
       </div>
     </dialog>
-      <div class="docker-dialog-heading">
-        <div>
-          <span class="panel-kicker" id="docker-dialog-kicker">LOCAL DOCKER SANDBOX</span>
-          <h2 id="docker-dialog-title">Valódi Git Dockerben</h2>
-        </div>
-        <button class="button button-quiet" id="docker-dialog-close" type="button" aria-label="Bezárás">×</button>
-      </div>
-      <p class="docker-dialog-intro" id="docker-dialog-intro"></p>
-      <ol class="docker-steps">
-        <li><span id="docker-step-one"></span><pre><code>docker compose -f docker-compose.playground.yml up --build -d</code></pre></li>
-        <li><span id="docker-step-two"></span><pre><code>docker compose -f docker-compose.playground.yml logs git-playground</code></pre></li>
-        <li><span id="docker-step-three"></span></li>
-      </ol>
-      <div class="docker-dialog-example">
-        <strong id="docker-example-title"></strong>
-        <pre><code>apk add git
-git --version
-git config --global user.name "Learner"
-git config --global user.email "learner@example.test"
-mkdir first-repo && cd first-repo
-git init
-echo "# First repo" > README.md
-git add README.md
-git commit -m "Initial commit"</code></pre>
-      </div>
-      <p class="docker-dialog-reset"><span id="docker-reset-copy"></span> <code>docker compose -f docker-compose.playground.yml down -v</code></p>
-      <div class="docker-dialog-actions">
-        <a class="button button-primary" id="docker-terminal-link" href="http://127.0.0.1:7681/" target="_blank" rel="noopener noreferrer"></a>
-        <button class="button button-secondary" id="docker-dialog-done" type="button"></button>
-      </div>
-    </dialog>
+    <script src="shared/lessons.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
