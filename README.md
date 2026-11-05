@@ -1,10 +1,14 @@
 # Git Workshop / Git műhely
 
+**Magyar:** [README.hu.md](./README.hu.md)
+
 A bilingual Git learning environment that runs entirely in a local Docker container. Use the language button in the header to switch between English and Hungarian. The web interface is served from the container, and every command typed into the terminal is executed as a real command inside the container — nothing is simulated. The lessons are original, step-by-step exercises for learning branches and commits.
 
-## Release 0.0.3
+## Release 0.0.4
 
-The application release version is `0.0.3`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
+The application release version is `0.0.4`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
+
+Magyar leírás: [README.hu.md](./README.hu.md)
 
 ## Screenshots
 

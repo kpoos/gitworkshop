@@ -1,6 +1,6 @@
 {
   "name": "git-workshop-server",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Git Workshop backend: executes real git commands inside the container and verifies exercises against the real repository state",
   "main": "src/server.js",
   "scripts": {
