@@ -26,7 +26,7 @@ const COMMAND_TIMEOUT_MS = 15000;
 const MAX_OUTPUT_BYTES = 200_000;
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_IMPORTS = 200;
-const MAX_COMMAND_LENGTH = 500;
+const MAX_COMMAND_LENGTH = 10_000;
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
@@ -41,9 +41,8 @@ const SHELL_USER = (() => {
   }
 })();
 
-// Commands the terminal may execute in the container. Everything else is
-// rejected so the sandbox stays predictable; `git` itself is unrestricted.
-const ALLOWED_COMMANDS = new Set([
+// Common command names shown by Tab completion; Bash can execute other commands too.
+const COMMAND_COMPLETIONS = new Set([
   "git", "ls", "pwd", "cat", "echo", "mkdir", "rmdir", "touch", "rm", "cp", "mv",
   "head", "tail", "wc", "grep", "tree", "find", "date", "whoami", "uname", "env",
   "printenv", "stat", "du", "df", "sort", "uniq", "basename", "dirname", "which",
@@ -85,7 +84,9 @@ function runProcess(program, args, options = {}) {
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
+    let control = "";
     let bytes = 0;
+    let controlBytes = 0;
     let truncated = false;
     let timedOut = false;
     let fileStream = null;
@@ -93,7 +94,8 @@ function runProcess(program, args, options = {}) {
     const child = spawn(program, args, {
       cwd: options.cwd,
       env: options.env,
-      stdio: ["pipe", "pipe", "pipe"],
+      detached: Boolean(options.processGroup),
+      stdio: options.captureControl ? ["pipe", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
     });
 
     if (options.stdoutFile) {
@@ -120,13 +122,27 @@ function runProcess(program, args, options = {}) {
       }
       stderr += chunk.toString();
     });
+    if (options.captureControl) {
+      child.stdio[3].on("data", (chunk) => {
+        controlBytes += chunk.length;
+        if (controlBytes <= MAX_OUTPUT_BYTES) control += chunk.toString();
+      });
+    }
 
     if (options.input !== undefined) child.stdin.end(options.input);
     else child.stdin.end();
 
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      if (options.processGroup && child.pid) {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch (error) {
+          if (error.code !== "ESRCH") child.kill("SIGKILL");
+        }
+      } else {
+        child.kill("SIGKILL");
+      }
     }, options.timeout || COMMAND_TIMEOUT_MS);
 
     const finish = (result) => {
@@ -136,13 +152,30 @@ function runProcess(program, args, options = {}) {
     };
 
     child.on("error", (error) => {
-      finish({ code: 127, stdout, stderr: `${stderr}${error.message}\n`, truncated, timedOut, pid: null });
+      finish({
+        code: 127,
+        stdout,
+        stderr: `${stderr}${error.message}\n`,
+        control,
+        truncated,
+        timedOut,
+        pid: null,
+      });
     });
     child.on("close", (code) => {
       let output = stdout;
       if (truncated) output += `\n[output truncated after ${MAX_OUTPUT_BYTES} bytes]`;
       if (timedOut) output += `\n[timed out after ${COMMAND_TIMEOUT_MS / 1000}s]`;
-      finish({ code: code === null ? 1 : code, stdout: output, stderr, truncated, timedOut, pid: child.pid });
+      finish({
+        code: code === null ? 1 : code,
+        stdout: output,
+        stderr,
+        control,
+        controlTruncated: controlBytes > MAX_OUTPUT_BYTES,
+        truncated,
+        timedOut,
+        pid: child.pid,
+      });
     });
   });
 }
@@ -563,6 +596,11 @@ async function buildState(session) {
 
   const laneOf = computeLanes(commits, branchTips, current, detached);
   const lesson = resolveLesson(session);
+  const cwd = sessionCwd(session);
+  const cwdInHome = path.relative(session.dir, cwd);
+  const displayedCwd = isInside(session.dir, cwd)
+    ? (cwdInHome ? `~/${cwdInHome}` : "~")
+    : cwd;
   const initialById = new Map((lesson?.initial || []).map((commit) => [commit.id, commit]));
   for (const commit of commits) {
     commit.lane = laneOf.get(commit.id) ?? 0;
@@ -586,7 +624,7 @@ async function buildState(session) {
       user: SHELL_USER,
       host: SHELL_HOST,
       dirty,
-      cwd: meta.cwd,
+      cwd: displayedCwd,
       verifiedLessons: [...meta.verifiedLessons],
       recentExecutions: [...meta.execLog].slice(-6).reverse(),
     },
@@ -650,16 +688,6 @@ async function snapshot(session) {
 /* Command execution inside the container                              */
 /* ------------------------------------------------------------------ */
 
-function tokenize(command) {
-  const tokens = [];
-  const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g;
-  let match;
-  while ((match = pattern.exec(command)) !== null) {
-    tokens.push(match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[3]);
-  }
-  return tokens;
-}
-
 function parseCompletionInput(input) {
   const words = [];
   let word = "";
@@ -711,15 +739,16 @@ function parseCompletionInput(input) {
       if (active) pushWord();
       continue;
     }
-    if ((character === "&" && input[index + 1] === "&") ||
-        (character === ">" && input[index + 1] === ">")) {
+    const operator = ["&&", "||", "|&", ">>", "<<", "&>"]
+      .find((candidate) => input.startsWith(candidate, index));
+    if (operator) {
       if (active) pushWord();
-      words.push(input.slice(index, index + 2));
-      index += 1;
+      words.push(operator);
+      index += operator.length - 1;
       wordStart = index + 1;
       continue;
     }
-    if (character === ">") {
+    if ([";", "|", ">", "<", "&"].includes(character)) {
       if (active) pushWord();
       words.push(character);
       wordStart = index + 1;
@@ -765,6 +794,10 @@ function completionWordEnd(input, cursor, initialQuote, initiallyEscaped) {
       quote = character;
       continue;
     }
+    if ([";", "|", ">", "<", "&"].includes(character) ||
+        ["&&", "||", "|&", ">>", "<<", "&>"].some((operator) => input.startsWith(operator, index))) {
+      return index;
+    }
     if (/\s/.test(character)) return index;
   }
   return input.length;
@@ -782,11 +815,11 @@ async function pathCompletions(session, word) {
     directory = path.resolve(session.dir, typedDirectory.slice(2));
   } else if (typedDirectory === "~") {
     directory = session.dir;
+  } else if (path.isAbsolute(typedDirectory)) {
+    directory = path.resolve(typedDirectory);
   } else {
     directory = path.resolve(cwd, typedDirectory || ".");
   }
-
-  if (!isInside(session.dir, directory)) return [];
 
   let realDirectory;
   try {
@@ -795,8 +828,6 @@ async function pathCompletions(session, word) {
     if (error.code === "ENOENT" || error.code === "ENOTDIR" || error.code === "EACCES") return [];
     throw error;
   }
-  if (!isInside(session.dir, realDirectory)) return [];
-
   let entries;
   try {
     entries = await fsp.readdir(realDirectory, { withFileTypes: true });
@@ -828,7 +859,10 @@ async function handleCompletion(session, payload) {
   }
 
   const parsed = parseCompletionInput(line.slice(0, cursor));
-  const separator = parsed.words.lastIndexOf("&&");
+  const separator = parsed.words.reduce(
+    (lastIndex, token, index) => ["&&", "||", "|", "|&", ";", "&"].includes(token) ? index : lastIndex,
+    -1,
+  );
   const words = parsed.words.slice(separator + 1);
   const word = parsed.word;
   const candidates = new Map();
@@ -839,7 +873,16 @@ async function handleCompletion(session, payload) {
   };
 
   if (words.length === 0) {
-    for (const command of ["cd", "clear", "help", ...ALLOWED_COMMANDS].sort()) add(command);
+    for (const command of ["cd", "clear", "help", ...COMMAND_COMPLETIONS].sort()) add(command);
+    const commandList = await runProcess(
+      "/bin/bash",
+      ["--noprofile", "--norc", "-c", "compgen -c"],
+      { cwd: sessionCwd(session), env: baseEnv(session) },
+    );
+    if (commandList.code !== 0) {
+      throw new Error(`Bash command completion failed: ${commandList.stderr || commandList.stdout}`);
+    }
+    for (const command of commandList.stdout.split("\n").filter(Boolean)) add(command);
   } else if (words[0] === "git" && words.length === 1) {
     for (const command of [
       "add", "branch", "checkout", "cherry-pick", "clone", "commit", "config", "diff",
@@ -891,8 +934,8 @@ function isInside(root, target) {
 }
 
 function sessionCwd(session) {
-  const candidate = path.resolve(session.dir, session.meta.cwd || "repo");
-  return isInside(session.dir, candidate) ? candidate : session.repoDir;
+  const stored = session.meta.cwd || "repo";
+  return path.isAbsolute(stored) ? path.resolve(stored) : path.resolve(session.dir, stored);
 }
 
 function recordExecution(session, entry) {
@@ -902,119 +945,118 @@ function recordExecution(session, entry) {
   if (entry.program === "git" && entry.exitCode === 0) session.meta.gitSuccessSinceSeed += 1;
 }
 
-async function executeSegment(session, tokens, outputs) {
-  let redirect = null;
-  const redirectIndex = tokens.findIndex((token) => token === ">" || token === ">>");
-  if (redirectIndex !== -1) {
-    if (tokens.length !== redirectIndex + 2 || !tokens[redirectIndex + 1]) {
-      return { code: "not-allowed", program: null };
-    }
-    redirect = { append: tokens[redirectIndex] === ">>", target: tokens[redirectIndex + 1] };
-    tokens = tokens.slice(0, redirectIndex);
-  }
-  if (!tokens.length) return { code: null, exitCode: 0 };
-
-  const program = tokens[0];
-  const args = tokens.slice(1);
+async function usableSessionCwd(session) {
   const cwd = sessionCwd(session);
-  const recordCommand = [...tokens, redirect ? (redirect.append ? ">>" : ">") : null, redirect ? redirect.target : null]
-    .filter(Boolean).join(" ");
-
-  if (program === "cd") {
-    const target = path.resolve(cwd, args[0] || session.dir);
-    let stat = null;
-    if (isInside(session.dir, target)) {
-      try {
-        stat = await fsp.stat(target);
-      } catch {
-        stat = null;
-      }
-    }
-    const ok = Boolean(stat && stat.isDirectory());
-    if (ok) session.meta.cwd = path.relative(session.dir, target) || ".";
-    else outputs.push(`cd: ${args[0] || target}: ${isInside(session.dir, target) ? "No such file or directory" : "outside of the sandbox"}\n`);
-    recordExecution(session, { command: ["cd", ...args].join(" "), program: "cd", exitCode: ok ? 0 : 1, spawned: false });
-    return { code: null, exitCode: ok ? 0 : 1 };
+  try {
+    const stat = await fsp.stat(cwd);
+    if (stat.isDirectory()) return cwd;
+  } catch (error) {
+    if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
   }
 
-  if (!ALLOWED_COMMANDS.has(program)) {
-    return { code: "not-allowed", program };
-  }
+  session.meta.cwd = "repo";
+  await saveMeta(session);
+  return session.repoDir;
+}
 
-  let stdoutFile = null;
-  if (redirect) {
-    stdoutFile = path.resolve(cwd, redirect.target);
-    if (!isInside(session.dir, stdoutFile)) {
-      outputs.push(`${redirect.target}: outside of the sandbox\n`);
-      recordExecution(session, { command: recordCommand, program, exitCode: 1, spawned: false });
-      return { code: null, exitCode: 1 };
-    }
-    try {
-      await fsp.access(path.dirname(stdoutFile));
-    } catch {
-      outputs.push(`${redirect.target}: No such file or directory\n`);
-      recordExecution(session, { command: recordCommand, program, exitCode: 1, spawned: false });
-      return { code: null, exitCode: 1 };
-    }
-  }
-
-  const result = await runProcess(program, args, {
+async function executeInSession(session, command) {
+  const cwd = await usableSessionCwd(session);
+  const shellScript = [
+    'readonly __git_workshop_state_file="$GIT_WORKSHOP_STATE_FILE"',
+    "readonly __git_workshop_command=$1",
+    "shift",
+    'if [[ -e "$__git_workshop_state_file" ]]; then source "$__git_workshop_state_file" || exit $?; fi',
+    "shopt -s expand_aliases",
+    "__git_workshop_save_state() {",
+    "  local __gw_status=$1 __gw_umask",
+    "  shift",
+    "  trap - EXIT",
+    "  __gw_umask=$(umask)",
+    "  umask 077",
+    '  if ! exec 4>| "$__git_workshop_state_file"; then',
+    '    printf "Failed to save shell state to %s\\n" "$__git_workshop_state_file" >&2',
+    '    printf "cwd\\0%s\\0" "$PWD" >&3',
+    "    exit 1",
+    "  fi",
+    '  umask "$__gw_umask"',
+    "  unset -f __git_workshop_save_state",
+    "  for __gw_name in $(compgen -v); do",
+    "    case \"$__gw_name\" in",
+    "      __gw_*|__git_workshop_*|GIT_WORKSHOP_*|BASH*|COMP_*|DIRSTACK|EPOCHREALTIME|EPOCHSECONDS|FUNCNAME|GROUPS|HISTCMD|LINENO|PIPESTATUS|RANDOM|SECONDS|SHELLOPTS|SRANDOM|UID|EUID|PPID|_) continue ;;",
+    "    esac",
+    '    __gw_declaration=$(declare -p "$__gw_name" 2>/dev/null) || continue',
+    "    __gw_flags=${__gw_declaration#declare -}",
+    "    __gw_flags=${__gw_flags%% *}",
+    '    [[ "$__gw_flags" == *r* ]] && continue',
+    '    printf "%s\\n" "$__gw_declaration" >&4',
+    "  done",
+    "  declare -f >&4",
+    "  alias -p >&4",
+    "  set +o >&4",
+    "  shopt -p >&4",
+    '  printf "set --" >&4',
+    '  printf " %q" "$@" >&4',
+    '  printf "\\n" >&4',
+    '  printf "umask %s\\n" "$__gw_umask" >&4',
+    "  exec 4>&-",
+    "  unset __gw_umask __gw_name __gw_declaration __gw_flags",
+    '  printf "cwd\\0%s\\0" "$PWD" >&3',
+    '  return "$__gw_status"',
+    "}",
+    "trap '__git_workshop_save_state \"$?\" \"$@\"' EXIT",
+    'eval "$__git_workshop_command"',
+  ].join("\n");
+  const result = await runProcess("/bin/bash", [
+    "--noprofile",
+    "--norc",
+    "-c",
+    shellScript,
+    "bash",
+    command,
+  ], {
     cwd,
-    env: baseEnv(session),
-    stdoutFile,
-    append: redirect ? redirect.append : undefined,
+    env: {
+      ...baseEnv(session),
+      PATH: `/opt/git-workshop/bin:${process.env.PATH}`,
+      GIT_WORKSHOP_GIT_LOG_FD: "3",
+      GIT_WORKSHOP_STATE_FILE: path.join(session.dir, ".bash-state"),
+    },
+    captureControl: true,
+    processGroup: true,
   });
 
   recordExecution(session, {
-    command: recordCommand,
-    program,
+    command,
+    program: "bash",
     exitCode: result.code,
     spawned: true,
     pid: result.pid,
   });
 
-  if (!stdoutFile) {
-    let text = result.stdout;
-    if (result.stderr) text += `${text ? "\n" : ""}${result.stderr}`;
-    if (text) outputs.push(text.endsWith("\n") ? text : `${text}\n`);
-  }
-  return { code: null, exitCode: result.code };
-}
-
-async function executeInSession(session, command) {
-  const outputs = [];
-  let notAllowed = null;
-  let lastExit = 0;
-
-  const segments = [];
-  let currentSegment = [];
-  for (const token of tokenize(command)) {
-    if (token === "&&") {
-      if (currentSegment.length) segments.push(currentSegment);
-      currentSegment = [];
-    } else {
-      currentSegment.push(token);
+  const fields = result.control.split("\0");
+  let finalCwd = null;
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    if (fields[index] === "git") {
+      const exitCode = Number(fields[index + 1]);
+      if (Number.isInteger(exitCode)) {
+        recordExecution(session, {
+          command: "git",
+          program: "git",
+          exitCode,
+          spawned: true,
+        });
+      }
+    } else if (fields[index] === "cwd") {
+      finalCwd = fields[index + 1];
     }
   }
-  if (currentSegment.length) segments.push(currentSegment);
 
-  for (const tokens of segments) {
-    const result = await executeSegment(session, tokens, outputs);
-    if (result.code === "not-allowed") {
-      notAllowed = result.program || null;
-      lastExit = 127;
-      break;
-    }
-    lastExit = result.exitCode;
-    if (result.exitCode !== 0) break; // `&&` semantics: stop at the first failure
-  }
-
+  if (finalCwd && path.isAbsolute(finalCwd)) session.meta.cwd = path.resolve(finalCwd);
   await saveMeta(session);
   return {
-    output: outputs.join(""),
-    error: lastExit !== 0,
-    notAllowed,
-    exitCode: lastExit,
+    output: result.stdout + (result.stderr ? `${result.stdout ? "\n" : ""}${result.stderr}` : ""),
+    error: result.code !== 0,
+    exitCode: result.code,
     execution: session.meta.execLog.at(-1) || null,
   };
 }
@@ -1220,7 +1262,13 @@ async function handleCommand(session, payload) {
 
   if (command.length > MAX_COMMAND_LENGTH) {
     const { state } = await snapshot(session);
-    return { output: "", error: true, code: "not-allowed", execution: null, state };
+    return {
+      output: "",
+      error: true,
+      code: "command-too-long",
+      execution: null,
+      state,
+    };
   }
 
   const executed = await executeInSession(session, command);
@@ -1229,7 +1277,7 @@ async function handleCommand(session, payload) {
   return {
     output: executed.output,
     error: Boolean(executed.error),
-    code: executed.notAllowed ? "not-allowed" : null,
+    code: null,
     execution: executed.execution,
     state,
     verification,

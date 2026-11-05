@@ -40,9 +40,9 @@ Seeded lesson commits are tagged with their exercise ids (`C0`, `C1`, …), whic
 
 The terminal header has two extra controls. **Check task** re-runs the server-side verification on demand: it reports the evidence (real repository state plus the number of real `git` commands executed since the lesson loaded), marks the current exercise complete when it passes, and on the next press advances to the next task. **Hint** reveals the current exercise step by step in the terminal — first the goal, then the tip, and finally the exact commands to run in the container.
 
-The terminal shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around.
+The terminal runs commands through Bash and shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around. Home-directory expansion such as `~/file.txt`, variables, quoting, globs, pipes, redirects, command substitution, and normal command chaining work as in a shell. The shell's working directory, variables, functions, and aliases persist between commands in a session. All commands run inside the Docker container.
 
-This is a constrained command line, not a full Bash shell. Press `Tab` to complete allowed commands, file and directory names in the practice session, and Git branches; press `Tab` again to list multiple matches.
+Press `Tab` to complete common commands, file and directory names, and Git branches; press `Tab` again to list multiple matches.
 
 ## Stopping and resetting
 
@@ -100,14 +100,12 @@ The YAML importer supports ordinary indented mappings/lists, quoted and plain sc
 
 ## Terminal commands
 
-The terminal runs in the container and accepts real programs from a fixed allowlist:
+The terminal runs commands in Bash inside the container:
 
-- `git …` — unrestricted real git: `status`, `log`, `config`, `remote`, `commit`, `branch`, `switch`, `merge`, `rebase`, `cherry-pick`, `clone`, `fetch`, `pull`, `reset`, `revert`, `restore`, and everything else git supports
-- file helpers: `ls`, `pwd`, `cat`, `echo`, `mkdir`, `touch`, `rm`, `cp`, `mv`, `head`, `tail`, `wc`, `grep`, `stat`, `find`, `date`, `whoami`, `uname`, …
-- `cd <directory>` — move inside your session workspace
-- `clear` — clear the terminal output, `help` — list the common commands
-- output redirection (`echo text > file.txt`, `>>`) and chaining with `&&`
+- Standard shell syntax is supported, including `~`/`$HOME` expansion, variables, quoting, globs, pipes, redirects, command substitution, and `&&`/`||`/`;` chaining.
+- `git …` is the real Git binary in the container. Git configuration and exercise repositories are per session.
+- `clear` clears the web terminal output; `help` shows shell examples.
 
-Anything else (for example `bash` or `node`) is rejected with an error. The container is the sandbox: no host files and no Docker socket are mounted, the process runs as an unprivileged user, and the compose file applies memory, CPU, process, and capability limits. Git commands that need the network (`clone`, `fetch`, `pull`) run from inside the container, so a bad URL simply fails with git's own error message.
+Commands run as an unprivileged user inside the Docker container, with no host files or Docker socket mounted. The Compose configuration applies memory, CPU, process, and capability limits. Git commands that need the network (`clone`, `fetch`, `pull`) run from inside the container, so a bad URL simply fails with Git's own error message.
 
 Configuration changes, remotes, and commits live in the session repository inside the container — they never touch your host machine's git configuration. Exercise progress (current lesson and verified tasks) is stored in the container volume and mirrored to your browser.

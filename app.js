@@ -46,16 +46,16 @@ const ui = {
     dockerCloseAria: "Bezárás",
     help: "Parancsok",
     terminalAria: "Parancssori kimenet",
-    commandAria: "Git parancs",
+    commandAria: "Shell parancs",
     runAria: "Parancs futtatása",
     placeholder: 'git commit -m "Első változtatás"',
     pressEnter: "Nyomj",
     runHint: "-t a futtatáshoz",
     historyHint: "előző parancs",
     completionHint: "kiegészítés",
-    welcome: "Gépeld be a git parancsot, majd nyomj Entert. A `help` megmutatja az elérhető parancsokat.",
+    welcome: "Gépeld be a shell parancsot, majd nyomj Entert. A `help` példákat mutat.",
     containerNote: "Valós parancsok futnak a Docker konténerben ({id}).",
-    notAllowed: "A '{command}' parancs itt nem engedélyezett. Engedélyezett programok: git, ls, pwd, cat, echo, mkdir, touch, rm, cp, mv, head, tail, wc, grep, cd. Írd be: help.",
+    commandTooLong: "A parancs túl hosszú (legfeljebb 10 000 karakter lehet).",
     serverError: "Nem sikerül elérni a Docker konténerben futó szervert. Indítsd el: docker compose up --build -d",
     dirtyStatus: "{count} módosított fájl",
     hintButton: "Súgás",
@@ -107,8 +107,8 @@ const ui = {
 
     completed: "Szép munka — teljesítetted a feladatot. Léphetsz tovább a következő leckére.",
     allCompleted: "Szép munka — teljesítetted az utolsó leckét is. Most már szabadon gyakorolhatsz.",
-    helpFirst: 'git config --global user.name "Név"  ·  git config --global user.email "email"  ·  git remote add origin <URL>',
-    helpSecond: 'git commit -m "üzenet"  ·  git branch <név>  ·  git switch <ág>  ·  git merge <ág>  ·  git rebase <ág>  ·  git cherry-pick <commit>  ·  git log  ·  git status  ·  git config  ·  ls  ·  cd <könyvtár>  ·  clear',
+    helpFirst: 'Bash: ls ~/  ·  echo "$HOME"  ·  cd ~/repo  ·  git status  ·  git log --oneline',
+    helpSecond: 'Változók, idézőjelek, globok, csővezetékek, átirányítások, parancshelyettesítés és parancsláncolás is használható. A parancsok a konténerben futnak.',
     commitCount: "{count} commit",
     language: "EN",
     languageAria: "Switch language to English",
@@ -207,16 +207,16 @@ const ui = {
     dockerCloseAria: "Close",
     help: "Commands",
     terminalAria: "Terminal output",
-    commandAria: "Git command",
+    commandAria: "Shell command",
     runAria: "Run command",
     placeholder: 'git commit -m "First change"',
     pressEnter: "Press",
     runHint: " to run",
     historyHint: "previous command",
     completionHint: "complete",
-    welcome: "Type a Git command and press Enter. Type `help` to see the available commands.",
+    welcome: "Type a shell command and press Enter. Type `help` for examples.",
     containerNote: "Real commands are running inside the Docker container ({id}).",
-    notAllowed: "The '{command}' command is not allowed here. Allowed programs: git, ls, pwd, cat, echo, mkdir, touch, rm, cp, mv, head, tail, wc, grep, cd. Type: help.",
+    commandTooLong: "The command is too long (maximum 10,000 characters).",
     serverError: "Cannot reach the server running in the Docker container. Start it with: docker compose up --build -d",
     dirtyStatus: "{count} changed file(s)",
     hintButton: "Hint",
@@ -268,8 +268,8 @@ const ui = {
 
     completed: "Nice work — task complete. You can move on to the next lesson.",
     allCompleted: "Nice work — you completed the final lesson. Feel free to keep practicing.",
-    helpFirst: 'git config --global user.name "Name"  ·  git config --global user.email "email"  ·  git remote add origin <URL>',
-    helpSecond: 'git commit -m "message"  ·  git branch <name>  ·  git switch <branch>  ·  git merge <branch>  ·  git rebase <branch>  ·  git cherry-pick <commit>  ·  git log  ·  git status  ·  git config  ·  ls  ·  cd <directory>  ·  clear',
+    helpFirst: 'Bash: ls ~/  ·  echo "$HOME"  ·  cd ~/repo  ·  git status  ·  git log --oneline',
+    helpSecond: 'Variables, quoting, globs, pipes, redirection, command substitution, and command chaining are supported. Commands run inside the container.',
     commitCount: "{count} commits",
     language: "HU",
     languageAria: "Váltás magyar nyelvre",
@@ -515,7 +515,7 @@ function applyServerState(nextState) {
 
 function promptText() {
   if (!state?.meta) return "$";
-  const cwd = state.meta.cwd && state.meta.cwd !== "." ? `~/${state.meta.cwd}` : "~";
+  const cwd = state.meta.cwd || "~";
   return `${state.meta.user || "user"}@${state.meta.host || "docker"}:${cwd}$`;
 }
 
@@ -536,14 +536,13 @@ async function processCommandQueue() {
   try {
     while (commandQueue.length > 0) {
       const command = commandQueue.shift();
-      const [program] = command.split(/\s+/);
-      if (program === "clear") {
+      if (command === "clear") {
         terminal.replaceChildren();
         continue;
       }
 
       addOutput(command, "command");
-      if (program === "help") {
+      if (command === "help") {
         addOutput(t("helpFirst"));
         addOutput(t("helpSecond"));
         continue;
@@ -556,8 +555,8 @@ async function processCommandQueue() {
       const requestedLesson = lessonIndex;
       try {
         const result = await api("/api/command", { sessionId, command, language });
-        if (result.code === "not-allowed") {
-          addOutput(t("notAllowed", { command: program }), "error");
+        if (result.code === "command-too-long") {
+          addOutput(t("commandTooLong"), "error");
         } else if (result.output) {
           addOutput(result.output, result.error ? "error" : "result");
         }
