@@ -150,7 +150,7 @@ function runProcess(program, args, options = {}) {
 function runGit(session, args, options = {}) {
   return runProcess("git", args, {
     cwd: options.cwd || session.repoDir,
-    env: { ...baseEnv(session), ...identityEnv(), ...(options.env || {}) },
+    env: { ...baseEnv(session), ...(options.env || {}) },
     input: options.input,
     timeout: options.timeout,
     stdoutFile: options.stdoutFile,
@@ -363,7 +363,10 @@ async function seed(session, lesson, language) {
     const args = ["commit-tree", treeById[commit.id]];
     for (const parentId of commit.parents || []) args.push("-p", idToSha[parentId]);
     args.push("-m", subject);
-    const result = await runGit(session, args, { cwd: session.repoDir });
+    const result = await runGit(session, args, {
+      cwd: session.repoDir,
+      env: identityEnv(),
+    });
     if (result.code !== 0) throw new Error(`git commit-tree failed: ${result.stderr || result.stdout}`);
     idToSha[commit.id] = result.stdout.trim();
   }
@@ -892,14 +895,6 @@ function sessionCwd(session) {
   return isInside(session.dir, candidate) ? candidate : session.repoDir;
 }
 
-async function identFallback(session) {
-  // Real git refuses to commit without an identity. Provide a fallback via
-  // environment only when the session has not configured one, so `git config`
-  // lessons still start from an empty configuration.
-  const result = await runGit(session, ["config", "user.email"]);
-  return result.code === 0 ? {} : identityEnv();
-}
-
 function recordExecution(session, entry) {
   session.meta.execLog.push({ ...entry, at: new Date().toISOString(), real: true });
   if (session.meta.execLog.length > 100) session.meta.execLog = session.meta.execLog.slice(-100);
@@ -963,12 +958,9 @@ async function executeSegment(session, tokens, outputs) {
     }
   }
 
-  const env = { ...baseEnv(session) };
-  if (program === "git") Object.assign(env, await identFallback(session));
-
   const result = await runProcess(program, args, {
     cwd,
-    env,
+    env: baseEnv(session),
     stdoutFile,
     append: redirect ? redirect.append : undefined,
   });

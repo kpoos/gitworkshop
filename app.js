@@ -462,6 +462,7 @@ let sessionId = null;
 let commandHistory = [];
 let commandHistoryIndex = 0;
 let commandBusy = false;
+const commandQueue = [];
 let lastTabCompletion = null;
 let hintStep = 0;
 const completedLessons = new Set();
@@ -522,39 +523,54 @@ function stripLessonMarkup(text) {
   return String(text).replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/`([^`]+)`/g, "$1");
 }
 
-async function runCommand(raw) {
+function runCommand(raw) {
   const command = raw.trim();
   if (!command) return;
-  const [program] = command.split(/\s+/);
-  if (program === "help") {
-    addOutput(command, "command");
-    addOutput(t("helpFirst"));
-    addOutput(t("helpSecond"));
-    return;
-  }
-  if (program === "clear") {
-    terminal.replaceChildren();
-    return;
-  }
-  addOutput(command, "command");
-  if (!sessionId || commandBusy) return;
+  commandQueue.push(command);
+  processCommandQueue();
+}
+
+async function processCommandQueue() {
+  if (commandBusy || commandQueue.length === 0) return;
   commandBusy = true;
-  const requestedLesson = lessonIndex;
   try {
-    const result = await api("/api/command", { sessionId, command, language });
-    if (result.code === "not-allowed") {
-      addOutput(t("notAllowed", { command: program }), "error");
-    } else if (result.output) {
-      addOutput(result.output, result.error ? "error" : "result");
+    while (commandQueue.length > 0) {
+      const command = commandQueue.shift();
+      const [program] = command.split(/\s+/);
+      if (program === "clear") {
+        terminal.replaceChildren();
+        continue;
+      }
+
+      addOutput(command, "command");
+      if (program === "help") {
+        addOutput(t("helpFirst"));
+        addOutput(t("helpSecond"));
+        continue;
+      }
+      if (!sessionId) {
+        addOutput(t("serverError"), "error");
+        continue;
+      }
+
+      const requestedLesson = lessonIndex;
+      try {
+        const result = await api("/api/command", { sessionId, command, language });
+        if (result.code === "not-allowed") {
+          addOutput(t("notAllowed", { command: program }), "error");
+        } else if (result.output) {
+          addOutput(result.output, result.error ? "error" : "result");
+        }
+        if (requestedLesson === lessonIndex) {
+          applyServerState(result.state);
+          render();
+          checkLesson();
+          saveProgress();
+        }
+      } catch (error) {
+        addOutput(t("serverError"), "error");
+      }
     }
-    if (requestedLesson === lessonIndex) {
-      applyServerState(result.state);
-      render();
-      checkLesson();
-      saveProgress();
-    }
-  } catch (error) {
-    addOutput(t("serverError"), "error");
   } finally {
     commandBusy = false;
   }
@@ -1223,6 +1239,7 @@ $("#verify-button").addEventListener("click", async () => {
     addOutput(t("serverError"), "error");
   } finally {
     commandBusy = false;
+    processCommandQueue();
     input.disabled = false;
     renderLessons();
     $("#verify-button").disabled = false;
