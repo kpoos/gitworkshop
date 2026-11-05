@@ -657,6 +657,230 @@ function tokenize(command) {
   return tokens;
 }
 
+function parseCompletionInput(input) {
+  const words = [];
+  let word = "";
+  let wordStart = input.length;
+  let active = false;
+  let quote = null;
+  let escaped = false;
+
+  const pushWord = () => {
+    words.push(word);
+    word = "";
+    active = false;
+    quote = null;
+    escaped = false;
+    wordStart = input.length;
+  };
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (escaped) {
+      word += character;
+      escaped = false;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'") quote = null;
+      else word += character;
+      continue;
+    }
+    if (quote === "\"") {
+      if (character === "\"") quote = null;
+      else if (character === "\\") escaped = true;
+      else word += character;
+      continue;
+    }
+    if (character === "\\") {
+      if (!active) wordStart = index;
+      active = true;
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === "\"") {
+      if (!active) wordStart = index;
+      active = true;
+      quote = character;
+      continue;
+    }
+    if (/\s/.test(character)) {
+      if (active) pushWord();
+      continue;
+    }
+    if ((character === "&" && input[index + 1] === "&") ||
+        (character === ">" && input[index + 1] === ">")) {
+      if (active) pushWord();
+      words.push(input.slice(index, index + 2));
+      index += 1;
+      wordStart = index + 1;
+      continue;
+    }
+    if (character === ">") {
+      if (active) pushWord();
+      words.push(character);
+      wordStart = index + 1;
+      continue;
+    }
+    if (!active) wordStart = index;
+    active = true;
+    word += character;
+  }
+
+  return {
+    words,
+    word: active ? word : "",
+    wordStart: active ? wordStart : input.length,
+    quote,
+    escaped,
+  };
+}
+
+function completionWordEnd(input, cursor, initialQuote, initiallyEscaped) {
+  let quote = initialQuote;
+  let escaped = initiallyEscaped;
+  for (let index = cursor; index < input.length; index += 1) {
+    const character = input[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'") quote = null;
+      continue;
+    }
+    if (quote === "\"") {
+      if (character === "\"") quote = null;
+      else if (character === "\\") escaped = true;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" || character === "\"") {
+      quote = character;
+      continue;
+    }
+    if (/\s/.test(character)) return index;
+  }
+  return input.length;
+}
+
+async function pathCompletions(session, word) {
+  if (word === "~") return [{ value: "~", directory: true }];
+  const slash = word.lastIndexOf("/");
+  const typedDirectory = slash === -1 ? "" : word.slice(0, slash + 1);
+  const namePrefix = slash === -1 ? word : word.slice(slash + 1);
+  const cwd = sessionCwd(session);
+  let directory;
+
+  if (typedDirectory.startsWith("~/")) {
+    directory = path.resolve(session.dir, typedDirectory.slice(2));
+  } else if (typedDirectory === "~") {
+    directory = session.dir;
+  } else {
+    directory = path.resolve(cwd, typedDirectory || ".");
+  }
+
+  if (!isInside(session.dir, directory)) return [];
+
+  let realDirectory;
+  try {
+    realDirectory = await fsp.realpath(directory);
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR" || error.code === "EACCES") return [];
+    throw error;
+  }
+  if (!isInside(session.dir, realDirectory)) return [];
+
+  let entries;
+  try {
+    entries = await fsp.readdir(realDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR" || error.code === "EACCES") return [];
+    throw error;
+  }
+
+  return entries
+    .filter((entry) => (
+      entry.name.startsWith(namePrefix)
+      && (!entry.name.startsWith(".") || namePrefix.startsWith("."))
+      && !/["'\\\n\r]/.test(entry.name)
+      && (entry.isFile() || entry.isDirectory())
+    ))
+    .map((entry) => ({ value: `${typedDirectory}${entry.name}`, directory: entry.isDirectory() }))
+    .sort((left, right) => left.value.localeCompare(right.value));
+}
+
+async function handleCompletion(session, payload) {
+  if (!payload || typeof payload.line !== "string") {
+    throw httpError(400, "invalid-completion", "Completion input must be a string");
+  }
+  const line = payload.line;
+  if (line.length > MAX_COMMAND_LENGTH) throw httpError(400, "command-too-long", "Completion input is too long");
+  const cursor = Number.isInteger(payload.cursor) ? payload.cursor : line.length;
+  if (cursor < 0 || cursor > line.length) {
+    throw httpError(400, "invalid-completion", "Completion cursor is outside the input");
+  }
+
+  const parsed = parseCompletionInput(line.slice(0, cursor));
+  const separator = parsed.words.lastIndexOf("&&");
+  const words = parsed.words.slice(separator + 1);
+  const word = parsed.word;
+  const candidates = new Map();
+  const add = (value, directory = false) => {
+    if (value.startsWith(word) && !/["'\\\n\r]/.test(value)) {
+      candidates.set(`${value}\0${directory}`, { value, directory });
+    }
+  };
+
+  if (words.length === 0) {
+    for (const command of ["cd", "clear", "help", ...ALLOWED_COMMANDS].sort()) add(command);
+  } else if (words[0] === "git" && words.length === 1) {
+    for (const command of [
+      "add", "branch", "checkout", "cherry-pick", "clone", "commit", "config", "diff",
+      "fetch", "init", "log", "merge", "mv", "pull", "push", "rebase", "remote",
+      "reset", "restore", "revert", "rm", "show", "status", "switch", "tag",
+    ]) add(command);
+  } else {
+    const program = words[0];
+    const args = words.slice(1);
+    const gitCommand = program === "git" ? args[0] : "";
+    const branchCommands = new Set(["checkout", "switch", "merge", "rebase", "cherry-pick"]);
+    const wantsBranch = program === "git" && (
+      (branchCommands.has(gitCommand) && !args.includes("--") && args.length >= 1)
+      || (gitCommand === "branch" && args.some((arg) => ["-d", "-D", "--delete"].includes(arg)))
+    );
+
+    if (wantsBranch) {
+      const branches = await runGit(session, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
+      if (branches.code === 0) {
+        for (const branch of branches.stdout.split("\n").filter(Boolean)) add(branch);
+      }
+    }
+
+    const pathCommands = new Set([
+      "cd", "ls", "cat", "mkdir", "rmdir", "touch", "rm", "cp", "mv", "head", "tail",
+      "wc", "grep", "tree", "find", "stat", "du", "sort", "uniq", "basename", "dirname",
+    ]);
+    const gitPathCommands = new Set(["add", "checkout", "diff", "mv", "restore", "rm"]);
+    const wantsPath = program === "git"
+      ? gitPathCommands.has(gitCommand) && (gitCommand !== "checkout" || args.includes("--"))
+      : pathCommands.has(program);
+    if (wantsPath) {
+      for (const item of await pathCompletions(session, word)) add(item.value, item.directory);
+    }
+  }
+
+  return {
+    wordStart: parsed.wordStart,
+    wordEnd: completionWordEnd(line, cursor, parsed.quote, parsed.escaped),
+    word,
+    candidates: [...candidates.values()].slice(0, 100),
+  };
+}
+
 function isInside(root, target) {
   const resolvedRoot = path.resolve(root);
   const resolvedTarget = path.resolve(target);
@@ -1054,6 +1278,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/session") {
       sendJson(res, 200, await handleSessionCreate(await readJson(req)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/complete") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleCompletion(session, payload)));
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/lesson") {

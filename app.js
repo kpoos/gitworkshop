@@ -52,6 +52,7 @@ const ui = {
     pressEnter: "Nyomj",
     runHint: "-t a futtatáshoz",
     historyHint: "előző parancs",
+    completionHint: "kiegészítés",
     welcome: "Gépeld be a git parancsot, majd nyomj Entert. A `help` megmutatja az elérhető parancsokat.",
     containerNote: "Valós parancsok futnak a Docker konténerben ({id}).",
     notAllowed: "A '{command}' parancs itt nem engedélyezett. Engedélyezett programok: git, ls, pwd, cat, echo, mkdir, touch, rm, cp, mv, head, tail, wc, grep, cd. Írd be: help.",
@@ -212,6 +213,7 @@ const ui = {
     pressEnter: "Press",
     runHint: " to run",
     historyHint: "previous command",
+    completionHint: "complete",
     welcome: "Type a Git command and press Enter. Type `help` to see the available commands.",
     containerNote: "Real commands are running inside the Docker container ({id}).",
     notAllowed: "The '{command}' command is not allowed here. Allowed programs: git, ls, pwd, cat, echo, mkdir, touch, rm, cp, mv, head, tail, wc, grep, cd. Type: help.",
@@ -460,6 +462,7 @@ let sessionId = null;
 let commandHistory = [];
 let commandHistoryIndex = 0;
 let commandBusy = false;
+let lastTabCompletion = null;
 let hintStep = 0;
 const completedLessons = new Set();
 
@@ -554,6 +557,80 @@ async function runCommand(raw) {
     addOutput(t("serverError"), "error");
   } finally {
     commandBusy = false;
+  }
+}
+
+function quoteCompletion(value) {
+  return /\s/.test(value) ? `"${value}"` : value;
+}
+
+function commonCompletionPrefix(values) {
+  if (!values.length) return "";
+  let length = values[0].length;
+  for (const value of values.slice(1)) {
+    length = Math.min(length, value.length);
+    let index = 0;
+    while (index < length && values[0][index] === value[index]) index += 1;
+    length = index;
+  }
+  return values[0].slice(0, length);
+}
+
+async function completeCommand(input) {
+  if (!sessionId || commandBusy) return;
+  const cursor = input.selectionStart ?? input.value.length;
+  const line = input.value.slice(0, cursor);
+  try {
+    const result = await api("/api/complete", { sessionId, line: input.value, cursor });
+    if (input.selectionStart !== cursor || input.value.slice(0, cursor) !== line) return;
+    const candidates = result.candidates || [];
+    if (!candidates.length) {
+      lastTabCompletion = null;
+      return;
+    }
+
+    const repeated = lastTabCompletion
+      && lastTabCompletion.line === line
+      && lastTabCompletion.cursor === cursor
+      && performance.now() - lastTabCompletion.at < 1000;
+    if (repeated) {
+      const labels = candidates.map(({ value, directory }) => `${value}${directory ? "/" : ""}`);
+      addOutput(labels.join("  "));
+      lastTabCompletion = null;
+      return;
+    }
+
+    if (candidates.length === 1) {
+      const candidate = candidates[0];
+      const insertion = `${quoteCompletion(candidate.value)}${candidate.directory ? "/" : ""}`;
+      const suffix = input.value.slice(result.wordEnd);
+      const separator = candidate.directory || suffix ? "" : " ";
+      input.value = `${input.value.slice(0, result.wordStart)}${insertion}${separator}${suffix}`;
+      const keepTypingInsideQuotes = candidate.directory && /\s/.test(candidate.value);
+      const nextCursor = result.wordStart + insertion.length - Number(keepTypingInsideQuotes) + separator.length;
+      input.setSelectionRange(nextCursor, nextCursor);
+      lastTabCompletion = null;
+      return;
+    }
+
+    const commonPrefix = commonCompletionPrefix(candidates.map(({ value }) => value));
+    if (commonPrefix.length > result.word.length) {
+      const insertion = quoteCompletion(commonPrefix);
+      input.value = `${input.value.slice(0, result.wordStart)}${insertion}${input.value.slice(result.wordEnd)}`;
+      const nextCursor = result.wordStart + insertion.length - Number(/\s/.test(commonPrefix));
+      input.setSelectionRange(nextCursor, nextCursor);
+      lastTabCompletion = {
+        line: input.value.slice(0, nextCursor),
+        cursor: nextCursor,
+        at: performance.now(),
+      };
+      return;
+    }
+
+    lastTabCompletion = { line, cursor, at: performance.now() };
+  } catch (error) {
+    lastTabCompletion = null;
+    addOutput(t("serverError"), "error");
   }
 }
 
@@ -972,6 +1049,7 @@ function applyLanguage() {
   $("#terminal-hint").textContent = text.pressEnter;
   $("#run-hint").textContent = text.runHint;
   $("#history-hint").textContent = text.historyHint;
+  $("#completion-hint").textContent = text.completionHint;
   $("#clear-imported").textContent = text.clearImported;
   if (state) render();
   setWelcome();
@@ -1063,15 +1141,24 @@ $("#command-form").addEventListener("submit", (event) => {
 });
 
 $("#command-input").addEventListener("keydown", (event) => {
-  if (event.key === "ArrowUp") {
+  if (event.key === "Tab") {
     event.preventDefault();
+    completeCommand(event.currentTarget);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    lastTabCompletion = null;
     commandHistoryIndex = Math.max(0, commandHistoryIndex - 1);
     event.currentTarget.value = commandHistory[commandHistoryIndex] || "";
   } else if (event.key === "ArrowDown") {
     event.preventDefault();
+    lastTabCompletion = null;
     commandHistoryIndex = Math.min(commandHistory.length, commandHistoryIndex + 1);
     event.currentTarget.value = commandHistory[commandHistoryIndex] || "";
   }
+});
+
+$("#command-input").addEventListener("input", () => {
+  lastTabCompletion = null;
 });
 
 $("#reset-button").addEventListener("click", () => loadLesson(lessonIndex));

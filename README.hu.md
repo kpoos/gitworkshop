@@ -38,6 +38,8 @@ A terminál fejlécében további vezérlők vannak. A **Feladat ellenőrzése**
 
 A terminál valós shell-promptot mutat a `learner@git-workshop:~/repo$` formában, amely követi a munkamenet munkakönyvtárát, ahogy `cd`-zel mozogsz.
 
+Ez egy korlátozott parancssor, nem teljes Bash shell. A `Tab` kiegészíti az engedélyezett parancsokat, a gyakorlómunkamenet fájl- és könyvtárneveit, valamint a Git-ágakat; több találatnál ismét nyomd meg a `Tab` billentyűt a lista megjelenítéséhez.
+
 ## Leállítás és visszaállítás
 
 ```sh

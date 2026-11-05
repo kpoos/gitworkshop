@@ -40,6 +40,8 @@ The terminal header has two extra controls. **Check task** re-runs the server-si
 
 The terminal shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around.
 
+This is a constrained command line, not a full Bash shell. Press `Tab` to complete allowed commands, file and directory names in the practice session, and Git branches; press `Tab` again to list multiple matches.
+
 ## Stopping and resetting
 
 ```sh
