@@ -175,6 +175,11 @@ h1 { margin: 17px 0 10px; font-size: clamp(24px, 2.2vw, 31px); letter-spacing: -
 .goal-card strong { display: block; margin: 0 0 7px; color: #ffc078; font-size: 12px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
 .goal-card p { margin: 0; color: #fff3e2; font-size: 14px; font-weight: 650; line-height: 1.7; overflow-wrap: anywhere; }
 .goal-card code { padding: .08em .22em; border-radius: 4px; background: rgb(10 17 24 / 55%); color: #ffe2b7; font: .88em var(--mono); overflow-wrap: anywhere; }
+.goal-card.understanding { border-color: #5689c4; background: linear-gradient(120deg, #1d3046, #202a35 74%, #1c2530); box-shadow: 0 0 0 3px rgb(121 184 255 / 10%), 0 8px 24px rgb(0 0 0 / 18%); }
+.goal-card.understanding .goal-icon { background: var(--blue); color: #102033; }
+.goal-card.understanding strong { color: #a9d2ff; }
+.goal-card.understanding p { color: #e4f0ff; }
+.goal-card.understanding code { color: #c9e2ff; }
 .goal-parameter { padding: .08em .28em; border: 0; border-bottom: 1px solid var(--accent); border-radius: 4px; background: var(--accent-dark); box-decoration-break: clone; -webkit-box-decoration-break: clone; color: #b6f5df; font: 800 .94em var(--mono); }
 .concept-card { margin-top: 17px; padding: 14px 15px; border: 1px solid var(--border); border-radius: 9px; background: rgb(23 30 39 / 65%); }
 .concept-heading { display: flex; align-items: center; gap: 7px; color: var(--orange); font-size: 9px; }

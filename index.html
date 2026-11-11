@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#10151c">
-    <meta name="application-version" content="0.0.4">
+    <meta name="application-version" content="0.0.5">
     <title>Git műhely — tanulj gyakorlással</title>
     <link rel="stylesheet" href="style.css">
   </head>
@@ -14,7 +14,7 @@
         <span class="brand-mark" aria-hidden="true">⌘</span>
         <span>git<span class="brand-accent" id="brand-name">műhely</span></span>
       </a>
-      <span class="version-badge" id="version-badge">v0.0.4</span>
+      <span class="version-badge" id="version-badge">v0.0.5</span>
       <div class="topbar-note"><span class="live-dot"></span><span id="offline-note">Helyben fut · nincs szükség internetre</span></div>
       <div class="topbar-actions">
         <button class="button button-quiet" id="import-button" type="button" aria-label="Feladatfájl importálása">Import</button>
@@ -39,7 +39,7 @@
           <button class="text-button" id="clear-imported" type="button" hidden>Eltávolítás</button>
         </div>
         <footer class="sidebar-footer">
-          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.4</span></span></div>
+          <div class="footer-release"><span id="sidebar-footer">Önálló gyakorlókörnyezet</span><span class="footer-release-version"><span aria-hidden="true">·</span> <span id="footer-version">v0.0.5</span></span></div>
           <a href="https://github.com/kpoos/gitworkshop" target="_blank" rel="noopener noreferrer">github.com/kpoos/gitworkshop</a>
         </footer>
       </aside>
@@ -110,8 +110,8 @@
       </div>
       <p class="docker-dialog-intro" id="docker-dialog-intro"></p>
       <ol class="docker-steps">
-        <li><span id="docker-step-one"></span><pre><code>docker compose up --build -d</code></pre></li>
-        <li><span id="docker-step-two"></span><pre><code>http://localhost:3000</code></pre></li>
+        <li><span id="docker-step-one"></span><pre><code>./install.sh start</code></pre></li>
+        <li><span id="docker-step-two"></span></li>
         <li><span id="docker-step-three"></span></li>
       </ol>
       <div class="docker-dialog-example">

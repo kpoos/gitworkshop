@@ -145,38 +145,77 @@ const lessons = [
     },
   },
   {
-    type: "reading",
+    type: "exercise",
+    scenario: {
+      type: "merge-conflict",
+      file: "settings.txt",
+      base: "mode=default\n",
+      feature: "mode=feature\n",
+      main: "mode=stable\n",
+      resolution: "mode=stable+feature\n",
+    },
     content: {
       hu: {
         title: "Merge conflict feloldása", category: "EGYESÍTÉS · 06",
         description: "Konfliktus akkor keletkezik, ha Git nem tudja automatikusan összeegyeztetni a módosításokat — gyakran két ág ugyanazokat a sorokat írta át.\n\n1. Futtasd a `git status` parancsot, és keresd az unmerged fájlokat.\n2. Nyisd meg az érintett fájlt. A `<<<<<<<`, `=======` és `>>>>>>>` jelölések mutatják a változatokat.\n3. Döntsd el, mi legyen a végleges tartalom; szerkeszd a fájlt, távolítsd el az összes jelölőt.\n4. Futtass teszteket, ellenőrizd a diffet (`git diff`), majd jelöld megoldottnak: `git add <fájl>`.\n5. Merge esetén fejezd be `git commit` paranccsal; rebase esetén `git rebase --continue`. Megszakításhoz: `git merge --abort` vagy `git rebase --abort`.",
-        goal: "A szándékos végleges tartalmat állítsd elő — ne csak töröld a konfliktusjelölőket.",
-        hint: "Ne fogadj el vakon egyik oldalt sem. Értsd meg mindkét módosítás célját, egyeztesd a csapattal, majd futtasd a releváns teszteket.",
+        goal: "Oldd fel a settings.txt konfliktust úgy, hogy a végleges érték `[[mode=stable+feature]]` legyen, majd fejezd be a merge-et.",
+        hint: "Nézd meg a `git status` kimenetét, írd a megadott végleges értéket a settings.txt fájlba, majd `git add settings.txt` és `git commit`.",
       },
       en: {
         title: "Resolving a merge conflict", category: "INTEGRATION · 06",
         description: "A conflict occurs when Git cannot automatically reconcile changes—often because two branches changed the same lines.\n\n1. Run `git status` and find the unmerged files.\n2. Open each file. `<<<<<<<`, `=======`, and `>>>>>>>` mark the competing versions.\n3. Decide on the intended result, edit the file, and remove every conflict marker.\n4. Run tests, review the diff with `git diff`, then mark it resolved: `git add <file>`.\n5. For a merge, finish with `git commit`; for a rebase, run `git rebase --continue`. Abort with `git merge --abort` or `git rebase --abort`.",
-        goal: "Resolve the conflict by choosing the intended final content—not merely by deleting the markers.",
-        hint: "Do not blindly accept one side. Understand both changes, coordinate with the team, and run relevant tests.",
+        goal: "Resolve the conflict in settings.txt to `[[mode=stable+feature]]`, then complete the merge.",
+        hint: "Inspect `git status`, write the intended value to settings.txt, then run `git add settings.txt` and `git commit`.",
       },
+    },
+    initial: [{ id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 }],
+    branches: { main: "C0" },
+    current: "main",
+    solution: [
+      'printf "mode=stable+feature\\n" > settings.txt',
+      "git add settings.txt",
+      'git commit -m "Resolve merge conflict"',
+    ],
+    check: (state) => {
+      const head = findCommit(state, state.branches.main);
+      return Boolean(head
+        && head.parents.length === 2
+        && state.unmergedPaths.length === 0
+        && state.dirtyPaths.length === 0
+        && state.files?.["settings.txt"] === "mode=stable+feature\n");
     },
   },
   {
-    type: "reading",
+    type: "exercise",
+    scenario: {
+      type: "restore-file",
+      file: "README.md",
+      dirtyContent: "Unsaved local draft\n",
+      expectedContent: "Project starts\n",
+    },
     content: {
       hu: {
         title: "Reset, revert és restore", category: "VISSZAVONÁS · 07",
         description: "Három hasonló nevű parancs, különböző hatókörrel.\n\n• `git restore <fájl>` visszaállít egy fájlt a working directoryban; `git restore --staged <fájl>` kiveszi a staging area-ból. A nem mentett tartalom elveszhet.\n• `git reset` egy korábbi commitra mozgatja az ágat/HEAD-et, és opcionálisan módosítja a staging area-t vagy a working directoryt (`--soft`, `--mixed`, `--hard`). A `--hard` helyi munkát törölhet.\n• `git revert <commit>` új commitot készít, amely visszafordít egy korábbi commitot. Megosztott történetnél ez általában biztonságosabb.\n\nMegosztott ágon részesítsd előnyben a `revert`-et. A reset előtt ellenőrizd a célt és legyen mentésed.",
-        goal: "Válassz a fájl-visszaállítás, helyi történet-átmozgatás és visszafordító commit között.",
-        hint: "`restore` fájlokra, `reset` az aktuális hivatkozásra/stagingre, `revert` új commitot készít. Különösen a `reset --hard` destruktív.",
+        goal: "Állítsd vissza a módosított README.md fájlt az utolsó commitban mentett állapotára.",
+        hint: "Ellenőrizd a módosítást `git diff` paranccsal, majd futtasd: `git restore README.md`. A `restore` fájlokra hat; a `reset` és `revert` más célra való.",
       },
       en: {
         title: "Reset, revert, and restore", category: "UNDOING · 07",
         description: "Three similarly named commands with different scopes.\n\n• `git restore <file>` restores files in the working directory; `git restore --staged <file>` removes them from the staging area. Uncommitted content can be lost.\n• `git reset` moves the branch/HEAD to an earlier commit and optionally changes the staging area or working directory (`--soft`, `--mixed`, `--hard`). `--hard` can destroy local work.\n• `git revert <commit>` creates a new commit that reverses an earlier commit's changes. This is generally safer for shared history.\n\nPrefer `revert` on shared branches. Check the target and make a backup before resetting.",
-        goal: "Choose between restoring files, moving local history, and creating an undo commit.",
-        hint: "`restore` operates on files, `reset` on the current reference/index, and `revert` creates a new commit. `reset --hard` is especially destructive.",
+        goal: "Restore the modified README.md file to the version in the latest commit.",
+        hint: "Inspect the change with `git diff`, then run `git restore README.md`. `restore` acts on files; `reset` and `revert` serve different purposes.",
       },
     },
+    initial: [{ id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 }],
+    branches: { main: "C0" },
+    current: "main",
+    solution: ["git restore README.md"],
+    check: (state) => state.files?.["README.md"] === (
+      state.meta.language === "hu" ? "Projekt indul\n" : "Project starts\n"
+    )
+      && !state.dirtyPaths.includes("README.md")
+      && !state.stagedPaths.includes("README.md"),
   },
   {
     type: "exercise",

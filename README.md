@@ -2,11 +2,11 @@
 
 **Magyar:** [README.hu.md](./README.hu.md)
 
-A bilingual Git learning environment that runs entirely in a local Docker container. Use the language button in the header to switch between English and Hungarian. The web interface is served from the container, and every command typed into the terminal is executed as a real command inside the container — nothing is simulated. The lessons are original, step-by-step exercises for learning branches and commits.
+A bilingual Git learning environment that runs entirely in local Docker containers. Use the language button in the header to switch between English and Hungarian. The web interface is served from a container, and every command typed into the terminal is executed as a real command inside the workshop container — nothing is simulated. The lessons are original, step-by-step exercises for learning branches and commits.
 
-## Release 0.0.4
+## Release 0.0.5
 
-The application release version is `0.0.4`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
+The application release version is `0.0.5`. The header and footer version labels are sourced from the `application-version` metadata in `index.html`.
 
 Magyar leírás: [README.hu.md](./README.hu.md)
 
@@ -18,7 +18,7 @@ Magyar leírás: [README.hu.md](./README.hu.md)
 
 ## Getting started
 
-Requirements: Docker Engine or Docker Desktop with Compose support, `curl`, and an internet connection for the initial image build.
+Requirements: Docker Engine or Docker Desktop with Compose support, `curl`, and an internet connection for the initial image builds.
 
 Clone the repository, then start the environment from its root:
 
@@ -26,9 +26,11 @@ Clone the repository, then start the environment from its root:
 ./install.sh start
 ```
 
-The script builds the Docker image, starts the container, waits for the application to be ready, and prints its URL. Open <http://localhost:3000> in a modern browser. The port is bound to `127.0.0.1`, so the app is reachable only from your own machine.
+The script builds the Docker image, starts Git Workshop and Gitea, seeds two example repositories, waits for both services, and prints their URLs. Git Workshop receives a random available localhost port; Gitea is at <http://localhost:3000>. Both ports are bound to `127.0.0.1`, so they are reachable only from your own machine.
 
-Manage the environment with `./install.sh status`, `./install.sh logs`, `./install.sh restart`, and `./install.sh stop`. Run `./install.sh help` for more information. Practice repositories persist in the `git-workshop-data` Docker volume across stops.
+The initial startup creates the local Gitea administrator account `learner` and prints a generated password. Save it; it is also stored in the `gitea-data` Docker volume and can be retrieved with `docker compose exec -u git gitea cat /data/gitea/git-workshop-learner-password`. The seeded public repositories are `learner/team-demo` and `learner/feature-project`. The Gitea web UI and its repositories are local-only; from Git Workshop's terminal use the internal Docker hostname, for example `git clone http://gitea:3000/learner/team-demo.git`.
+
+Manage the environment with `./install.sh status`, `./install.sh logs`, `./install.sh restart`, and `./install.sh stop`. Run `./install.sh help` for more information. Practice repositories persist in the `git-workshop-data` Docker volume, and Gitea data persists separately in `gitea-data`.
 
 ## Real commands, verified exercises
 
@@ -47,11 +49,11 @@ Press `Tab` to complete common commands, file and directory names, and Git branc
 ## Stopping and resetting
 
 ```sh
-docker compose down      # stop the container, keep practice repositories
-docker compose down -v   # stop and delete the practice data volume
+docker compose down      # stop both services, keep practice and Gitea data
+docker compose down -v   # stop and delete both data volumes
 ```
 
-The named `git-workshop-data` volume keeps each session's repositories across container restarts. **Restart** rebuilds the current exercise's repository inside the container; **Progress → Clear Progress** also resets the recorded completions.
+The named `git-workshop-data` volume keeps each session's repositories across container restarts. The separate `gitea-data` volume keeps the local Gitea account and repositories. **Restart** rebuilds the current exercise's repository inside the container; **Progress → Clear Progress** also resets the recorded completions.
 
 ## Contact and contributions
 
@@ -77,6 +79,8 @@ The app contains 43 command-checked exercises plus guided concept lessons. The b
 14. Branching strategies for multiple teams and continuous delivery.
 
 Concept lessons can be completed with **Next lesson**. Commit, branch, merge, rebase, and cherry-pick exercises use the interactive graph and the container-backed terminal; their completion is verified against the real repository state.
+
+Concept-only lessons use a blue **Understanding** panel, while hands-on tasks use the orange **Your task** panel. The merge-conflict exercise starts with a real unresolved conflict in `settings.txt`; the restore exercise starts with a modified tracked `README.md`. **Restart** recreates each scenario so you can practice the Git operation against a real repository state.
 
 ## Importing exercises
 

@@ -20,6 +20,7 @@ const ui = {
     tip: "A Git pillanatképeket ment. A branchek csak könnyű, mozgatható hivatkozások a commitokra.",
     footer: "Önálló gyakorlókörnyezet",
     goal: "Feladat",
+    understanding: "Megértés",
     concept: "GONDOLJ ERRE",
     previous: "Előző",
     next: "Következő lecke",
@@ -35,9 +36,9 @@ const ui = {
     dockerPlayground: "Docker környezet",
     dockerTitle: "Valódi Git a helyi Dockerben",
     dockerKicker: "HELYI DOCKER FUTTATÓKÖRNYEZET",
-    dockerIntro: "Az egész alkalmazás a helyi Docker konténerben fut. A terminálba írt parancsok valódi rendszerparancsokként a konténerben hajtódnak végre, és a feladatok ellenőrzése is a konténer valós repository-állapotából történik — nincs szimuláció. A gazda gép fájljai nincsenek becsatolva; egy törölhető Docker-kötet tárolja a gyakorló repository-kat.",
-    dockerStepOne: "A repository gyökérkönyvtárából építsd fel és indítsd el a környezetet:",
-    dockerStepTwo: "Nyisd meg az alkalmazást a böngészőben:",
+    dockerIntro: "Az alkalmazás helyi Docker-konténerekben fut. A terminálba írt parancsok valódi rendszerparancsokként a konténerben hajtódnak végre, és a feladatok ellenőrzése is a konténer valós repository-állapotából történik — nincs szimuláció. A gazda gép fájljai nincsenek becsatolva; a gyakorló repository-kat és a helyi Gitea-adatokat külön Docker-kötetek őrzik meg.",
+    dockerStepOne: "A repository gyökérkönyvtárából indítsd el a környezetet:",
+    dockerStepTwo: "A Git műhely portja véletlenszerű; nyisd meg a ./install.sh start vagy ./install.sh status által kiírt URL-t.",
     dockerStepThree: "A terminálba írt parancsok azonnal a konténerben futnak. Az Újrakezdés gomb újraépíti az aktuális feladat repository-ját; a bal oldali listában lépkedhetsz a leckék között.",
     dockerExample: "Példa valós parancsokkal",
     dockerReset: "A környezet és az összes gyakorlófájl törlése:",
@@ -144,6 +145,7 @@ const ui = {
     tip: "Git saves snapshots. Branches are lightweight, movable references to commits.",
     footer: "Self-guided learning environment",
     goal: "Your task",
+    understanding: "Understanding",
     concept: "THE IDEA",
     previous: "Previous",
     next: "Next lesson",
@@ -196,9 +198,9 @@ const ui = {
     dockerPlayground: "Docker environment",
     dockerTitle: "Real Git in local Docker",
     dockerKicker: "LOCAL DOCKER ENVIRONMENT",
-    dockerIntro: "The whole application runs in a local Docker container. Commands typed into the terminal execute as real system commands inside the container, and exercises are verified against the container's real repository state — no simulation. No host files are mounted; a single disposable Docker volume stores the practice repositories.",
-    dockerStepOne: "From the repository root, build and start the environment:",
-    dockerStepTwo: "Open the application in your browser:",
+    dockerIntro: "The application runs in local Docker containers. Commands typed into the terminal execute as real system commands inside the container, and exercises are verified against the container's real repository state — no simulation. No host files are mounted; separate Docker volumes persist the practice repositories and local Gitea data.",
+    dockerStepOne: "From the repository root, start the environment:",
+    dockerStepTwo: "The Git Workshop port is assigned randomly; open the URL printed by ./install.sh start or ./install.sh status.",
     dockerStepThree: "Commands you type run inside the container immediately. The Restart button rebuilds the current exercise's repository; use the list on the left to move between lessons.",
     dockerExample: "Example with real commands",
     dockerReset: "Delete the environment and all practice files:",
@@ -792,16 +794,18 @@ function renderLessons() {
     lessonList.append(button);
   });
   const content = lessons[lessonIndex].content[language];
+  const lesson = lessons[lessonIndex];
+  const lessonType = lesson.type || "exercise";
   $("#lesson-category").textContent = content.category;
   $("#lesson-counter").textContent = `${String(lessonIndex + 1).padStart(2, "0")} / ${String(lessons.length).padStart(2, "0")}`;
   $("#lesson-title").textContent = content.title;
   $("#lesson-description").textContent = content.description;
+  $(".goal-card").classList.toggle("understanding", lessonType === "reading");
+  $("#goal-label").textContent = lessonType === "reading" ? t("understanding") : t("goal");
   renderGoal($("#lesson-goal"), content.goal);
   $("#lesson-hint").textContent = content.hint;
   $("#prev-lesson").disabled = lessonIndex === 0;
-  const lesson = lessons[lessonIndex];
   const isLast = lessonIndex === lessons.length - 1;
-  const lessonType = lesson.type || "exercise";
   $("#next-label").textContent = isLast ? t("finish") : t("next");
   $("#next-lesson").disabled = lessonType === "exercise"
     ? !state?.meta?.verification?.verified
