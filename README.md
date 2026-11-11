@@ -87,12 +87,16 @@ See [`custom-exercises.json`](./custom-exercises.json) and [`custom-exercises.ya
 Each exercise has a `check` object. Supported checks:
 
 - `{ "type": "commit-count", "minimum": 2 }` — require a number of new commits.
+- `{ "type": "commit-message" }` — require a new commit with any non-empty message.
+- `{ "type": "config-value", "scope": "global", "key": "user.name" }` — require a non-empty value for the selected local or global Git config key; the learner chooses the value.
 - `{ "type": "branch-ahead", "branch": "feature", "base": "main" }` — require the feature branch to advance from its base.
 - `{ "type": "merge-commit", "branch": "main" }` — require a two-parent commit at the branch tip.
 - `{ "type": "rebase", "branch": "feature", "onto": "main" }` — require the feature tip to be based on main.
 - `{ "type": "cherry-pick", "branch": "main", "source": "C2", "onto": "C1" }` — require the selected change at the destination branch tip.
 
 In a goal string, wrap values learners must supply in `[[double brackets]]` to highlight them distinctly. For example, `Set the email to \`[[learner@example.test]]\`.` renders the email as a highlighted value while keeping the command context in code style.
+
+For `config-value`, set `scope` to `local` or `global` and provide the Git config `key`. The check accepts any non-empty string value for that key. The `commit-message` check passes when there is at least one new commit whose message is not empty or whitespace-only. See [`custom-exercises.json`](./custom-exercises.json) for examples of both checks.
 
 `initial` is an optional array of commit objects with `id`, `parents`, localized `message`, and optional `lane` (0–20). Parents must refer to earlier commits in the array, and branch names must point to an initial commit.
 

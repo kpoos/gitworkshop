@@ -1,26 +1,26 @@
 {
   "lessons": [
     {
-      "id": "practice-small-commits",
+      "id": "choose-author-name",
       "title": {
-        "hu": "Két kis commit",
-        "en": "Two small commits"
+        "hu": "Saját szerzői név",
+        "en": "Choose an author name"
       },
       "category": {
-        "hu": "SAJÁT FELADAT · COMMIT",
-        "en": "CUSTOM EXERCISE · COMMITS"
+        "hu": "SAJÁT FELADAT · KONFIGURÁCIÓ",
+        "en": "CUSTOM EXERCISE · CONFIGURATION"
       },
       "description": {
-        "hu": "Gyakorold, hogyan bontasz egy munkát két külön, jól érthető commitra.",
-        "en": "Practice splitting work into two separate, easy-to-understand commits."
+        "hu": "Állíts be egy tetszőleges, nem üres globális szerzői nevet a Gitben.",
+        "en": "Set any non-empty global author name in Git."
       },
       "goal": {
-        "hu": "Készíts két új commitot a main ágon.",
-        "en": "Create two new commits on main."
+        "hu": "Állítsd be a globális Git szerzői nevedet egy általad választott értékre.",
+        "en": "Set your global Git author name to a value of your choice."
       },
       "hint": {
-        "hu": "Használd kétszer a git commit -m \"üzenet\" parancsot.",
-        "en": "Run git commit -m \"message\" twice."
+        "hu": "Futtasd a `git config --global user.name \"A saját neved\"` parancsot; az idézőjelek közötti értéket szabadon választhatod meg.",
+        "en": "Run `git config --global user.name \"Your Name\"`; choose any value for the text in quotes."
       },
       "initial": [
         {
@@ -38,8 +38,50 @@
       },
       "current": "main",
       "check": {
-        "type": "commit-count",
-        "minimum": 2
+        "type": "config-value",
+        "scope": "global",
+        "key": "user.name"
+      }
+    },
+    {
+      "id": "choose-commit-message",
+      "title": {
+        "hu": "Saját commitüzenet",
+        "en": "Choose a commit message"
+      },
+      "category": {
+        "hu": "SAJÁT FELADAT · COMMIT",
+        "en": "CUSTOM EXERCISE · COMMITS"
+      },
+      "description": {
+        "hu": "Készíts egy commitot olyan üzenettel, amelyet te választasz.",
+        "en": "Create a commit with a message of your choice."
+      },
+      "goal": {
+        "hu": "Készíts egy új commitot bármilyen nem üres üzenettel.",
+        "en": "Create a new commit with any non-empty message."
+      },
+      "hint": {
+        "hu": "A feladat előre előkészített egy staged változtatást. Ha a Gitben még nincs szerzői azonosító, állítsd be a `git config user.name \"A saját neved\"` és a `git config user.email tanulo@example.test` paranccsal, majd futtasd a `git commit -m \"Saját üzenet\"` parancsot. Az üzenet szabadon választható.",
+        "en": "The exercise has a change staged for you. If Git has no author identity yet, set it with `git config user.name \"Your Name\"` and `git config user.email learner@example.test`, then run `git commit -m \"My message\"`. Choose any message you like."
+      },
+      "initial": [
+        {
+          "id": "C0",
+          "parents": [],
+          "message": {
+            "hu": "Kiinduló állapot",
+            "en": "Starting point"
+          },
+          "lane": 0
+        }
+      ],
+      "branches": {
+        "main": "C0"
+      },
+      "current": "main",
+      "check": {
+        "type": "commit-message"
       }
     }
   ]

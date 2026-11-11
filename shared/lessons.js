@@ -642,6 +642,28 @@ function validateImportedLesson(source, knownIds, language = "en") {
       }
       break;
     }
+    case "commit-message": {
+      const initialCommitIds = new Set(commits.map((commit) => commit.id));
+      checker = (state) => state.commits.some((commit) => (
+        !initialCommitIds.has(commit.id)
+        && typeof commit.message === "string"
+        && commit.message.trim().length > 0
+      ));
+      break;
+    }
+    case "config-value": {
+      const scope = check.scope;
+      const key = typeof check.key === "string" ? check.key.trim() : "";
+      if (!["local", "global"].includes(scope) || !key) {
+        throw new Error(`Lesson "${source.id}": config-value needs scope "local" or "global" and a non-empty key.`);
+      }
+      checker = (state) => Object.entries(state.config?.[scope] || {}).some(([configuredKey, value]) => (
+        configuredKey.toLowerCase() === key.toLowerCase()
+        && typeof value === "string"
+        && value.trim().length > 0
+      ));
+      break;
+    }
     case "branch-ahead": {
       const branch = check.branch;
       const base = check.base ?? current;
@@ -691,7 +713,7 @@ function validateImportedLesson(source, knownIds, language = "en") {
       break;
     }
     default:
-      throw new Error(`Lesson "${source.id}": check.type must be commit-count, branch-ahead, merge-commit, rebase, or cherry-pick.`);
+      throw new Error(`Lesson "${source.id}": check.type must be commit-count, commit-message, config-value, branch-ahead, merge-commit, rebase, or cherry-pick.`);
   }
   return {
     id: source.id,
@@ -708,7 +730,7 @@ function validateImportedLesson(source, knownIds, language = "en") {
     current,
     check: checker,
     imported: true,
-    pendingChange: check.type === "commit-count" || check.type === "branch-ahead",
+    pendingChange: check.type === "commit-count" || check.type === "commit-message" || check.type === "branch-ahead",
     ...(solution && solution.length ? { solution } : {}),
   };
 }
