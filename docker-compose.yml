@@ -4,9 +4,13 @@ services:
     container_name: git-workshop
     hostname: git-workshop
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1::3000"
     volumes:
       - git-workshop-data:/workspace
+    depends_on:
+      - gitea
+    networks:
+      - workshop
     init: true
     mem_limit: 512m
     cpus: 0.5
@@ -16,5 +20,44 @@ services:
     cap_drop:
       - ALL
 
+  gitea:
+    image: docker.gitea.com/gitea:28.3.0
+    container_name: git-workshop-gitea
+    environment:
+      USER_UID: 1000
+      USER_GID: 1000
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__repository__DEFAULT_PRIVATE: "false"
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__server__DISABLE_SSH: "true"
+      GITEA__server__DOMAIN: localhost
+      GITEA__server__HTTP_PORT: 3000
+      GITEA__server__ROOT_URL: http://localhost:3000/
+      GITEA__service__DISABLE_REGISTRATION: "true"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - gitea-data:/data
+    networks:
+      - workshop
+    init: true
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+
+networks:
+  workshop:
+
 volumes:
   git-workshop-data:
+  gitea-data:

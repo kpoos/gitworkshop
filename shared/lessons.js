@@ -145,38 +145,77 @@ const lessons = [
     },
   },
   {
-    type: "reading",
+    type: "exercise",
+    scenario: {
+      type: "merge-conflict",
+      file: "settings.txt",
+      base: "mode=default\n",
+      feature: "mode=feature\n",
+      main: "mode=stable\n",
+      resolution: "mode=stable+feature\n",
+    },
     content: {
       hu: {
         title: "Merge conflict feloldása", category: "EGYESÍTÉS · 06",
         description: "Konfliktus akkor keletkezik, ha Git nem tudja automatikusan összeegyeztetni a módosításokat — gyakran két ág ugyanazokat a sorokat írta át.\n\n1. Futtasd a `git status` parancsot, és keresd az unmerged fájlokat.\n2. Nyisd meg az érintett fájlt. A `<<<<<<<`, `=======` és `>>>>>>>` jelölések mutatják a változatokat.\n3. Döntsd el, mi legyen a végleges tartalom; szerkeszd a fájlt, távolítsd el az összes jelölőt.\n4. Futtass teszteket, ellenőrizd a diffet (`git diff`), majd jelöld megoldottnak: `git add <fájl>`.\n5. Merge esetén fejezd be `git commit` paranccsal; rebase esetén `git rebase --continue`. Megszakításhoz: `git merge --abort` vagy `git rebase --abort`.",
-        goal: "A szándékos végleges tartalmat állítsd elő — ne csak töröld a konfliktusjelölőket.",
-        hint: "Ne fogadj el vakon egyik oldalt sem. Értsd meg mindkét módosítás célját, egyeztesd a csapattal, majd futtasd a releváns teszteket.",
+        goal: "Oldd fel a settings.txt konfliktust úgy, hogy a végleges érték `[[mode=stable+feature]]` legyen, majd fejezd be a merge-et.",
+        hint: "Nézd meg a `git status` kimenetét, írd a megadott végleges értéket a settings.txt fájlba, majd `git add settings.txt` és `git commit`.",
       },
       en: {
         title: "Resolving a merge conflict", category: "INTEGRATION · 06",
         description: "A conflict occurs when Git cannot automatically reconcile changes—often because two branches changed the same lines.\n\n1. Run `git status` and find the unmerged files.\n2. Open each file. `<<<<<<<`, `=======`, and `>>>>>>>` mark the competing versions.\n3. Decide on the intended result, edit the file, and remove every conflict marker.\n4. Run tests, review the diff with `git diff`, then mark it resolved: `git add <file>`.\n5. For a merge, finish with `git commit`; for a rebase, run `git rebase --continue`. Abort with `git merge --abort` or `git rebase --abort`.",
-        goal: "Resolve the conflict by choosing the intended final content—not merely by deleting the markers.",
-        hint: "Do not blindly accept one side. Understand both changes, coordinate with the team, and run relevant tests.",
+        goal: "Resolve the conflict in settings.txt to `[[mode=stable+feature]]`, then complete the merge.",
+        hint: "Inspect `git status`, write the intended value to settings.txt, then run `git add settings.txt` and `git commit`.",
       },
+    },
+    initial: [{ id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 }],
+    branches: { main: "C0" },
+    current: "main",
+    solution: [
+      'printf "mode=stable+feature\\n" > settings.txt',
+      "git add settings.txt",
+      'git commit -m "Resolve merge conflict"',
+    ],
+    check: (state) => {
+      const head = findCommit(state, state.branches.main);
+      return Boolean(head
+        && head.parents.length === 2
+        && state.unmergedPaths.length === 0
+        && state.dirtyPaths.length === 0
+        && state.files?.["settings.txt"] === "mode=stable+feature\n");
     },
   },
   {
-    type: "reading",
+    type: "exercise",
+    scenario: {
+      type: "restore-file",
+      file: "README.md",
+      dirtyContent: "Unsaved local draft\n",
+      expectedContent: "Project starts\n",
+    },
     content: {
       hu: {
         title: "Reset, revert és restore", category: "VISSZAVONÁS · 07",
         description: "Három hasonló nevű parancs, különböző hatókörrel.\n\n• `git restore <fájl>` visszaállít egy fájlt a working directoryban; `git restore --staged <fájl>` kiveszi a staging area-ból. A nem mentett tartalom elveszhet.\n• `git reset` egy korábbi commitra mozgatja az ágat/HEAD-et, és opcionálisan módosítja a staging area-t vagy a working directoryt (`--soft`, `--mixed`, `--hard`). A `--hard` helyi munkát törölhet.\n• `git revert <commit>` új commitot készít, amely visszafordít egy korábbi commitot. Megosztott történetnél ez általában biztonságosabb.\n\nMegosztott ágon részesítsd előnyben a `revert`-et. A reset előtt ellenőrizd a célt és legyen mentésed.",
-        goal: "Válassz a fájl-visszaállítás, helyi történet-átmozgatás és visszafordító commit között.",
-        hint: "`restore` fájlokra, `reset` az aktuális hivatkozásra/stagingre, `revert` új commitot készít. Különösen a `reset --hard` destruktív.",
+        goal: "Állítsd vissza a módosított README.md fájlt az utolsó commitban mentett állapotára.",
+        hint: "Ellenőrizd a módosítást `git diff` paranccsal, majd futtasd: `git restore README.md`. A `restore` fájlokra hat; a `reset` és `revert` más célra való.",
       },
       en: {
         title: "Reset, revert, and restore", category: "UNDOING · 07",
         description: "Three similarly named commands with different scopes.\n\n• `git restore <file>` restores files in the working directory; `git restore --staged <file>` removes them from the staging area. Uncommitted content can be lost.\n• `git reset` moves the branch/HEAD to an earlier commit and optionally changes the staging area or working directory (`--soft`, `--mixed`, `--hard`). `--hard` can destroy local work.\n• `git revert <commit>` creates a new commit that reverses an earlier commit's changes. This is generally safer for shared history.\n\nPrefer `revert` on shared branches. Check the target and make a backup before resetting.",
-        goal: "Choose between restoring files, moving local history, and creating an undo commit.",
-        hint: "`restore` operates on files, `reset` on the current reference/index, and `revert` creates a new commit. `reset --hard` is especially destructive.",
+        goal: "Restore the modified README.md file to the version in the latest commit.",
+        hint: "Inspect the change with `git diff`, then run `git restore README.md`. `restore` acts on files; `reset` and `revert` serve different purposes.",
       },
     },
+    initial: [{ id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 }],
+    branches: { main: "C0" },
+    current: "main",
+    solution: ["git restore README.md"],
+    check: (state) => state.files?.["README.md"] === (
+      state.meta.language === "hu" ? "Projekt indul\n" : "Project starts\n"
+    )
+      && !state.dirtyPaths.includes("README.md")
+      && !state.stagedPaths.includes("README.md"),
   },
   {
     type: "exercise",
@@ -434,23 +473,24 @@ lessons.unshift(
     title: { hu: "Git-identitás beállítása", en: "Configure your Git identity" },
     category: { hu: "GIT BEÁLLÍTÁSOK · 01", en: "GIT CONFIGURATION · 01" },
     description: {
-      hu: "A Git a commitok szerzőjeként a nevet és az e-mail-címet rögzíti. Ezek beállíthatók felhasználói szinten (`--global`) vagy csak az aktuális repositoryhoz.\n\nÁllíts be egy globális nevet és e-mail-címet. A mintacím fenntartott `.test` tartományt használ, nem valódi postafiók.",
-      en: "Git records a name and email address as the author of each commit. These can be configured globally (`--global`) or just for the current repository.\n\nSet a global name and email. The sample address uses the reserved `.test` domain and is not a real mailbox.",
+      hu: "A Git a commitok szerzőjeként a nevet és az e-mail-címet rögzíti. Ezek beállíthatók felhasználói szinten (`--global`) vagy csak az aktuális repositoryhoz.\n\nÁllíts be tetszőleges, nem üres globális nevet és e-mail-címet.",
+      en: "Git records a name and email address as the author of each commit. These can be configured globally (`--global`) or just for the current repository.\n\nChoose any non-empty global name and email address.",
     },
     goal: {
-      hu: 'Állítsd be: `git config --global user.name "[[Learner Example]]"` és `git config --global user.email "[[learner@example.test]]"`.',
-      en: 'Set `git config --global user.name "[[Learner Example]]"` and `git config --global user.email "[[learner@example.test]]"`.',
+      hu: "Állítsd be a globális `user.name` és `user.email` értékét egy általad választott, nem üres stringre.",
+      en: "Set global `user.name` and `user.email` to any non-empty strings of your choice.",
     },
     hint: {
-      hu: 'Ellenőrizd az értékeket a `git config --global --list` vagy a `git config --global --get user.email` paranccsal. Ezek a feladat mintaadatai.',
-      en: 'Verify the values with `git config --global --list` or `git config --global --get user.email`. These are sample values for the exercise.',
+      hu: 'Használd a `git config --global user.name "A saját neved"` és a `git config --global user.email "a-sajat-cimed@example.test"` parancsot. Mindkét érték szabadon választható; ellenőrizd őket a `git config --global --list` paranccsal.',
+      en: 'Run `git config --global user.name "Your Name"` and `git config --global user.email "you@example.test"`. Choose both values freely, then verify them with `git config --global --list`.',
     },
     solution: [
       'git config --global user.name "Learner Example"',
       "git config --global user.email learner@example.test",
     ],
-    check: (s) => s.config.global["user.name"] === "Learner Example"
-      && s.config.global["user.email"] === "learner@example.test",
+    check: (s) => ["user.name", "user.email"].every((key) => (
+      typeof s.config.global[key] === "string" && s.config.global[key].trim().length > 0
+    )),
   }),
   practiceGitConfig({
     title: { hu: "Repository-beállítások", en: "Repository-level settings" },
@@ -482,15 +522,15 @@ lessons.unshift(
       en: "A remote is a named connection to another repository. `origin` is the conventional default name, usually created automatically when you clone.\n\nAdd `origin` with the practice URL, list remotes, then try changing its URL with `git remote set-url`.",
     },
     goal: {
-      hu: "Az `[[origin]]` URL-je legyen `[[https://github.com/example/git-practice.git]]`.",
-      en: "Set the `[[origin]]` URL to `[[https://github.com/example/git-practice.git]]`.",
+      hu: "Adj hozzá egy `[[origin]]` nevű remote-ot, amely egy általad választott Git repository URL-jére mutat.",
+      en: "Add a remote named `[[origin]]` pointing to any Git repository URL of your choice.",
     },
     hint: {
-      hu: "Add hozzá: `git remote add origin https://github.com/example/git-practice.git`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
-      en: "Add it with `git remote add origin https://github.com/example/git-practice.git`. Verify with `git remote -v`. To change it, use `git remote set-url origin <new-URL>`.",
+      hu: "Add hozzá a saját repository URL-jével: `git remote add origin <repository-URL>`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
+      en: "Add it with `git remote add origin <repository-URL>`, replacing the placeholder with your repository's URL. Verify with `git remote -v`. To change it, use `git remote set-url origin <new-URL>`.",
     },
     solution: ["git remote add origin https://github.com/example/git-practice.git"],
-    check: (s) => s.remotes.origin === "https://github.com/example/git-practice.git",
+    check: (s) => typeof s.remotes.origin === "string" && s.remotes.origin.trim().length > 0,
   }),
 );
 
@@ -651,6 +691,19 @@ function validateImportedLesson(source, knownIds, language = "en") {
       ));
       break;
     }
+    case "config-value": {
+      const scope = check.scope;
+      const key = typeof check.key === "string" ? check.key.trim() : "";
+      if (!["local", "global"].includes(scope) || !key) {
+        throw new Error(`Lesson "${source.id}": config-value needs scope "local" or "global" and a non-empty key.`);
+      }
+      checker = (state) => Object.entries(state.config?.[scope] || {}).some(([configuredKey, value]) => (
+        configuredKey.toLowerCase() === key.toLowerCase()
+        && typeof value === "string"
+        && value.trim().length > 0
+      ));
+      break;
+    }
     case "branch-ahead": {
       const branch = check.branch;
       const base = check.base ?? current;
@@ -712,7 +765,7 @@ function validateImportedLesson(source, knownIds, language = "en") {
       break;
     }
     default:
-      throw new Error(`Lesson "${source.id}": check.type must be commit-count, commit-message, branch-ahead, merge-commit, rebase, cherry-pick, or config-value.`);
+      throw new Error(`Lesson "${source.id}": check.type must be commit-count, commit-message, config-value, branch-ahead, merge-commit, rebase, or cherry-pick.`);
   }
   return {
     id: source.id,
@@ -729,7 +782,7 @@ function validateImportedLesson(source, knownIds, language = "en") {
     current,
     check: checker,
     imported: true,
-    pendingChange: check.type === "commit-count" || check.type === "branch-ahead",
+    pendingChange: check.type === "commit-count" || check.type === "commit-message" || check.type === "branch-ahead",
     ...(solution && solution.length ? { solution } : {}),
   };
 }

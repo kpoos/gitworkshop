@@ -368,6 +368,13 @@ async function seed(session, lesson, language) {
   const init = await runGit(session, ["init", "--quiet"], { cwd: session.repoDir });
   if (init.code !== 0) throw new Error(`git init failed: ${init.stderr || init.stdout}`);
 
+  if (lesson.id !== "builtin-01") {
+    for (const [key, value] of [["user.name", "Learner"], ["user.email", "learner@example.test"]]) {
+      const identity = await runGit(session, ["config", "--local", key, value], { cwd: session.repoDir });
+      if (identity.code !== 0) throw new Error(`git config ${key} failed: ${identity.stderr || identity.stdout}`);
+    }
+  }
+
   // Build real commits with real content: every seeded commit adds its own
   // file, so later merges, rebases and cherry-picks produce genuine diffs.
   const emptyTree = await runGit(session, ["mktree"], { input: "" });
@@ -423,6 +430,38 @@ async function seed(session, lesson, language) {
     await fsp.writeFile(path.join(session.repoDir, "notes.txt"), "Pending change ready to be committed.\n");
     const staged = await runGit(session, ["add", "notes.txt"], { cwd: session.repoDir });
     if (staged.code !== 0) throw new Error(`git add failed: ${staged.stderr || staged.stdout}`);
+  }
+
+  if (lesson.scenario?.type === "merge-conflict") {
+    const { file, base, feature, main } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    const runScenarioGit = async (args) => {
+      const result = await runGit(session, args, { cwd: session.repoDir });
+      if (result.code !== 0) throw new Error(`Scenario git ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
+    };
+
+    await fsp.writeFile(scenarioPath, base);
+    await runScenarioGit(["add", file]);
+    await runScenarioGit(["commit", "-m", "Add shared setting"]);
+    await runScenarioGit(["switch", "-c", "feature"]);
+    await fsp.writeFile(scenarioPath, feature);
+    await runScenarioGit(["add", file]);
+    await runScenarioGit(["commit", "-m", "Set feature mode"]);
+    await runScenarioGit(["switch", current]);
+    await fsp.writeFile(scenarioPath, main);
+    await runScenarioGit(["add", file]);
+    await runScenarioGit(["commit", "-m", "Set stable mode"]);
+    const merge = await runGit(session, ["merge", "feature"], { cwd: session.repoDir });
+    const unmerged = await runGit(session, ["diff", "--name-only", "--diff-filter=U"], { cwd: session.repoDir });
+    if (merge.code === 0 || unmerged.code !== 0 || !unmerged.stdout.split("\n").includes(file)) {
+      throw new Error(`Failed to prepare merge conflict for ${file}: ${merge.stderr || merge.stdout || unmerged.stderr}`);
+    }
+  } else if (lesson.scenario?.type === "restore-file") {
+    const { file, dirtyContent } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    await fsp.writeFile(scenarioPath, dirtyContent);
   }
 
   // Tag every seeded commit with its lesson id so commands like
@@ -590,12 +629,32 @@ async function buildState(session) {
   }
 
   const status = await runGit(session, ["status", "--porcelain"]);
-  const dirty = status.code === 0
-    ? status.stdout.split("\n").filter((line) => line.trim()).length
-    : 0;
+  const statusLines = status.code === 0 ? status.stdout.split("\n").filter((line) => line.trim()) : [];
+  const dirtyPaths = statusLines.map((line) => line.slice(3));
+  const stagedPaths = statusLines
+    .filter((line) => line[0] !== " " && line[0] !== "?")
+    .map((line) => line.slice(3));
+  const unstagedPaths = statusLines
+    .filter((line) => line[1] !== " " && line[0] !== "?")
+    .map((line) => line.slice(3));
+  const unmerged = await runGit(session, ["diff", "--name-only", "--diff-filter=U"]);
+  const unmergedPaths = unmerged.code === 0 ? unmerged.stdout.split("\n").filter(Boolean) : [];
+  const lesson = resolveLesson(session);
+  const files = {};
+  if (lesson?.scenario?.file) {
+    const file = lesson.scenario.file;
+    const target = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, target)) throw new Error(`Invalid scenario file path: ${file}`);
+    try {
+      files[file] = await fsp.readFile(target, "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      files[file] = null;
+    }
+  }
+  const dirty = statusLines.length;
 
   const laneOf = computeLanes(commits, branchTips, current, detached);
-  const lesson = resolveLesson(session);
   const cwd = sessionCwd(session);
   const cwdInHome = path.relative(session.dir, cwd);
   const displayedCwd = isInside(session.dir, cwd)
@@ -618,12 +677,18 @@ async function buildState(session) {
       global: parseConfigList(globalConfig.code === 0 ? globalConfig.stdout : "", globalCase),
     },
     remotes,
+    files,
+    dirtyPaths,
+    stagedPaths,
+    unstagedPaths,
+    unmergedPaths,
     meta: {
       source: "docker-container",
       container: SHELL_HOST,
       user: SHELL_USER,
       host: SHELL_HOST,
       dirty,
+      language: meta.language,
       cwd: displayedCwd,
       verifiedLessons: [...meta.verifiedLessons],
       recentExecutions: [...meta.execLog].slice(-6).reverse(),

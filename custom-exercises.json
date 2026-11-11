@@ -62,8 +62,8 @@
         "en": "Create a new commit with any non-empty message."
       },
       "hint": {
-        "hu": "Módosíts egy fájlt, add hozzá a staging area-hoz, majd futtasd például a `git commit -m \"Saját üzenet\"` parancsot. Az üzenet szabadon választható.",
-        "en": "Change a file, stage it, then run a command such as `git commit -m \"My message\"`. Choose any message you like."
+        "hu": "A feladat előre előkészített egy staged változtatást. Ha a Gitben még nincs szerzői azonosító, állítsd be a `git config user.name \"A saját neved\"` és a `git config user.email tanulo@example.test` paranccsal, majd futtasd a `git commit -m \"Saját üzenet\"` parancsot. Az üzenet szabadon választható.",
+        "en": "The exercise has a change staged for you. If Git has no author identity yet, set it with `git config user.name \"Your Name\"` and `git config user.email learner@example.test`, then run `git commit -m \"My message\"`. Choose any message you like."
       },
       "initial": [
         {

@@ -2,11 +2,11 @@
 
 **English:** [README.md](./README.md)
 
-Kétnyelvű Git tanulási környezet, amely teljes egészében egy helyi Docker konténerben fut. A fejléc nyelvváltó gombjával válthatsz angol és magyar között. A webfelületet a konténer szolgálja ki, és minden, a terminálba írt parancs valódi parancsként a konténerben hajtódik végre — semmi sem szimulált. A leckék eredeti, lépésről lépésre haladó feladatok az ágak és commitok tanulásához.
+Kétnyelvű Git tanulási környezet, amely teljes egészében helyi Docker-konténerekben fut. A fejléc nyelvváltó gombjával válthatsz angol és magyar között. A webfelületet egy konténer szolgálja ki, és minden, a terminálba írt parancs valódi parancsként a gyakorlókörnyezet konténerében hajtódik végre — semmi sem szimulált. A leckék eredeti, lépésről lépésre haladó feladatok az ágak és commitok tanulásához.
 
-## Kiadás 0.0.4
+## Kiadás 0.0.5
 
-Az alkalmazás verziószáma `0.0.4`. A fejléc és lábléc verziófeliratai az `index.html` `application-version` metaadataiból származnak.
+Az alkalmazás verziószáma `0.0.5`. A fejléc és lábléc verziófeliratai az `index.html` `application-version` metaadataiból származnak.
 
 ## Képernyőképek
 
@@ -16,7 +16,7 @@ Az alkalmazás verziószáma `0.0.4`. A fejléc és lábléc verziófeliratai az
 
 ## Első lépések
 
-Előfeltételek: Docker Engine vagy Docker Desktop Compose támogatással, `curl`, valamint internetkapcsolat a kép első építéséhez.
+Előfeltételek: Docker Engine vagy Docker Desktop Compose támogatással, `curl`, valamint internetkapcsolat az image-ek első letöltéséhez.
 
 Klónozd a repository-t, majd annak gyökérkönyvtárából indítsd el a környezetet:
 
@@ -24,9 +24,11 @@ Klónozd a repository-t, majd annak gyökérkönyvtárából indítsd el a körn
 ./install.sh start
 ```
 
-A script felépíti a Docker image-et, elindítja a konténert, megvárja az alkalmazás indulását, majd kiírja az elérhetőséget. Nyisd meg a <http://localhost:3000> címet egy modern böngészőben. A port a `127.0.0.1` címre van kötve, így az alkalmazás csak a saját gépedről érhető el.
+A script felépíti a Docker image-et, elindítja a Git műhelyt és a Giteát, létrehoz két példa-repository-t, megvárja mindkét szolgáltatás indulását, majd kiírja az elérhetőségeket. A Git műhely egy véletlenszerűen kiosztott localhost portot kap; a Gitea a <http://localhost:3000> címen érhető el. Mindkét port a `127.0.0.1` címre van kötve, így a szolgáltatások csak a saját gépedről érhetők el.
 
-A környezet kezeléséhez használd a `./install.sh status`, `./install.sh logs`, `./install.sh restart` és `./install.sh stop` parancsokat. A `./install.sh help` további információt ad. A gyakorló repository-k a `git-workshop-data` Docker-kötetben maradnak meg a leállítások között.
+Az első indítás létrehozza a `learner` nevű helyi Gitea-adminisztrátori fiókot, és kiír egy véletlenszerű jelszót. Mentsd el; a `gitea-data` Docker-kötetben is megtalálható a `docker compose exec -u git gitea cat /data/gitea/git-workshop-learner-password` paranccsal. Az előre létrehozott nyilvános repository-k: `learner/team-demo` és `learner/feature-project`. A Gitea webes felülete és repository-jai csak helyben érhetők el; a Git műhely termináljából a belső Docker-gépnevet használd, például: `git clone http://gitea:3000/learner/team-demo.git`.
+
+A környezet kezeléséhez használd a `./install.sh status`, `./install.sh logs`, `./install.sh restart` és `./install.sh stop` parancsokat. A `./install.sh help` további információt ad. A gyakorló repository-k a `git-workshop-data`, a Gitea-adatok pedig külön a `gitea-data` Docker-kötetben maradnak meg a leállítások között.
 
 ## Valós parancsok, ellenőrzött feladatok
 
@@ -45,11 +47,11 @@ A `Tab` gyakori parancsokat, fájl- és könyvtárneveket, valamint Git-ágakat 
 ## Leállítás és visszaállítás
 
 ```sh
-docker compose down      # konténer leállítása, a gyakorló repository-k megmaradnak
-docker compose down -v   # leállítás és az adatkötet törlése
+docker compose down      # mindkét szolgáltatás leállítása, az adatok megtartásával
+docker compose down -v   # leállítás és mindkét adatkötet törlése
 ```
 
-A névadott `git-workshop-data` kötet a munkamenetek repository-it a konténer újraindításai között is megőrzi. Az **Újrakezdés** újraépíti az aktuális feladat repository-ját a konténerben; az **Előrehaladás → Előrehaladás törlése** a rögzített teljesítéseket is visszaállítja.
+A névadott `git-workshop-data` kötet a munkamenetek repository-it, a külön `gitea-data` kötet pedig a helyi Gitea-fiókot és repository-kat őrzi meg a konténerek újraindításai között. Az **Újrakezdés** újraépíti az aktuális feladat repository-ját a konténerben; az **Előrehaladás → Előrehaladás törlése** a rögzített teljesítéseket is visszaállítja.
 
 ## Kapcsolat és közreműködés
 
@@ -76,6 +78,8 @@ Az alkalmazás 43 parancs-ellenőrzött gyakorlatot és irányított fogalmi lec
 
 A fogalmi leckék a **Következő lecke** gombbal teljesíthetők. A commit, branch, merge, rebase és cherry-pick feladatok az interaktív gráfot és a konténerhez kötött terminált használják; teljesítésüket a valós repository-állapot alapján ellenőrizzük.
 
+A csak fogalmi leckék kék **Megértés** panelt, a gyakorlati feladatok narancssárga **Feladat** panelt kapnak. A merge-konfliktus feladat egy valódi, feloldatlan konfliktussal indul a `settings.txt` fájlban; a restore feladat egy módosított, követett `README.md` fájlt készít elő. Az **Újrakezdés** újra létrehozza ezeket a helyzeteket, így a Git-parancsok valódi repository-állapoton gyakorolhatók.
+
 ## Feladatok importálása
 
 Válaszd az **Import** lehetőséget, és jelölj ki egy `.json`, `.yaml` vagy `.yml` fájlt. Az importált feladatok a tanulási útvonal végéhez fűződnek, a böngésző local storage-ében tárolódnak, és a konténerbe is szinkronizálódnak, hogy ellenőrzésük szerveroldalon is történhessen. Az azonos ID kétszeri importálása elutasításra kerül. Az alkalmazás legfeljebb 200 importált feladatot és 1 MB-os fájlt fogad el. Az **Újrakezdés** az aktív feladatot állítja vissza, az importállapot melletti **Eltávolítás** pedig minden importált feladatot töröl.
@@ -86,6 +90,7 @@ Minden feladathoz tartozik egy `check` objektum. Támogatott ellenőrzések:
 
 - `{ "type": "commit-count", "minimum": 2 }` — megadott számú új commitot követel meg.
 - `{ "type": "commit-message" }` — új commitot követel meg tetszőleges, nem üres üzenettel.
+- `{ "type": "config-value", "scope": "global", "key": "user.name" }` — nem üres értéket követel meg a megadott helyi vagy globális Git-konfigurációs kulcshoz; az értéket a tanuló választja meg.
 - `{ "type": "branch-ahead", "branch": "feature", "base": "main" }` — megköveteli, hogy a feature branch elhagyja az alapját.
 - `{ "type": "merge-commit", "branch": "main" }` — két szülős commitot követel meg az ág csúcsán.
 - `{ "type": "rebase", "branch": "feature", "onto": "main" }` — megköveteli, hogy a feature csúcsa a main-re épüljön.
@@ -94,7 +99,11 @@ Minden feladathoz tartozik egy `check` objektum. Támogatott ellenőrzések:
 
 A célszövegben a tanulónak megadandó értékeket `[[dupla szögletes zárójel]]` közé zárva emelheted ki. Például: `Állítsd be az e-mailt: \`[[learner@example.test]]\`.` — az e-mail kiemelt értékként jelenik meg, miközben a parancskontextus kódstílusú marad.
 
-A `config-value` típusnál a `scope` értéke `local` vagy `global`, a `key` pedig a Git-konfiguráció kulcsa legyen. Az ellenőrzés bármilyen nem üres stringet elfogad ehhez a kulcshoz. A [`custom-exercises.json`](./custom-exercises.json) példa lehetővé teszi, hogy a tanuló maga válassza ki a globális `user.name` értékét.
+A beépített **Git-identitás beállítása** feladat bármilyen nem üres globális `user.name` és `user.email` értéket elfogad; a súgóban vagy megoldásban szereplő példák nem kötelezőek.
+
+A beépített **Remote origin beállítása** feladat az `origin` remote bármilyen nem üres repository-URL-jét elfogadja; a példában szereplő URL csak helyőrző.
+
+A `config-value` típusnál a `scope` értéke `local` vagy `global`, a `key` pedig a Git-konfiguráció kulcsa legyen. Az ellenőrzés bármilyen nem üres stringet elfogad ehhez a kulcshoz. A `commit-message` ellenőrzés legalább egy új commitot követel meg nem üres, nem csak szóközökből álló üzenettel. Mindkét típusra példa található a [`custom-exercises.json`](./custom-exercises.json) fájlban.
 
 A `commit-message` ellenőrzés akkor teljesül, ha legalább egy új commit üzenete nem üres és nem csak szóközökből áll; az üzenetet a tanuló választja meg.
 
