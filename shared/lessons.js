@@ -752,6 +752,18 @@ function validateImportedLesson(source, knownIds, language = "en") {
       solution = [`git switch ${branch}`, `git cherry-pick ${sourceCommit}`];
       break;
     }
+    case "config-value": {
+      const { scope, key } = check;
+      if (!["local", "global"].includes(scope) || typeof key !== "string" || !key.trim()) {
+        throw new Error(`Lesson "${source.id}": config-value needs scope "local" or "global" and a non-empty key.`);
+      }
+      checker = (state) => Object.entries(state.config?.[scope] || {}).some(([configuredKey, value]) => (
+        configuredKey.toLowerCase() === key.toLowerCase()
+        && typeof value === "string"
+        && value.trim().length > 0
+      ));
+      break;
+    }
     default:
       throw new Error(`Lesson "${source.id}": check.type must be commit-count, commit-message, config-value, branch-ahead, merge-commit, rebase, or cherry-pick.`);
   }
