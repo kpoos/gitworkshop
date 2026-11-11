@@ -483,15 +483,15 @@ lessons.unshift(
       en: "A remote is a named connection to another repository. `origin` is the conventional default name, usually created automatically when you clone.\n\nAdd `origin` with the practice URL, list remotes, then try changing its URL with `git remote set-url`.",
     },
     goal: {
-      hu: "Az `[[origin]]` URL-je legyen `[[https://github.com/example/git-practice.git]]`.",
-      en: "Set the `[[origin]]` URL to `[[https://github.com/example/git-practice.git]]`.",
+      hu: "Adj hozzá egy `[[origin]]` nevű remote-ot, amely egy általad választott Git repository URL-jére mutat.",
+      en: "Add a remote named `[[origin]]` pointing to any Git repository URL of your choice.",
     },
     hint: {
-      hu: "Add hozzá: `git remote add origin https://github.com/example/git-practice.git`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
-      en: "Add it with `git remote add origin https://github.com/example/git-practice.git`. Verify with `git remote -v`. To change it, use `git remote set-url origin <new-URL>`.",
+      hu: "Add hozzá a saját repository URL-jével: `git remote add origin <repository-URL>`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
+      en: "Add it with `git remote add origin <repository-URL>`, replacing the placeholder with your repository's URL. Verify with `git remote -v`. To change it, use `git remote set-url origin <new-URL>`.",
     },
     solution: ["git remote add origin https://github.com/example/git-practice.git"],
-    check: (s) => s.remotes.origin === "https://github.com/example/git-practice.git",
+    check: (s) => typeof s.remotes.origin === "string" && s.remotes.origin.trim().length > 0,
   }),
 );
 

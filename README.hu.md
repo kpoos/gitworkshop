@@ -96,6 +96,8 @@ A célszövegben a tanulónak megadandó értékeket `[[dupla szögletes zárój
 
 A beépített **Git-identitás beállítása** feladat bármilyen nem üres globális `user.name` és `user.email` értéket elfogad; a súgóban vagy megoldásban szereplő példák nem kötelezőek.
 
+A beépített **Remote origin beállítása** feladat az `origin` remote bármilyen nem üres repository-URL-jét elfogadja; a példában szereplő URL csak helyőrző.
+
 A `config-value` típusnál a `scope` értéke `local` vagy `global`, a `key` pedig a Git-konfiguráció kulcsa legyen. Az ellenőrzés bármilyen nem üres stringet elfogad ehhez a kulcshoz. A `commit-message` ellenőrzés legalább egy új commitot követel meg nem üres, nem csak szóközökből álló üzenettel. Mindkét típusra példa található a [`custom-exercises.json`](./custom-exercises.json) fájlban.
 
 Az `initial` egy opcionális commitobjektum-tömb `id`, `parents`, lokalizált `message` és opcionális `lane` (0–20) mezőkkel. A szülők a tömb korábbi commitjaira hivatkozhatnak, és a branchneveknek kiinduló commitra kell mutatniuk.
