@@ -96,6 +96,8 @@ Each exercise has a `check` object. Supported checks:
 
 In a goal string, wrap values learners must supply in `[[double brackets]]` to highlight them distinctly. For example, `Set the email to \`[[learner@example.test]]\`.` renders the email as a highlighted value while keeping the command context in code style.
 
+The built-in **Configure your Git identity** exercise accepts any non-empty global `user.name` and `user.email`; the example values in hints or solutions are not required.
+
 For `config-value`, set `scope` to `local` or `global` and provide the Git config `key`. The check accepts any non-empty string value for that key. The `commit-message` check passes when there is at least one new commit whose message is not empty or whitespace-only. See [`custom-exercises.json`](./custom-exercises.json) for examples of both checks.
 
 `initial` is an optional array of commit objects with `id`, `parents`, localized `message`, and optional `lane` (0–20). Parents must refer to earlier commits in the array, and branch names must point to an initial commit.

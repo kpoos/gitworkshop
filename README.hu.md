@@ -94,6 +94,8 @@ Minden feladathoz tartozik egy `check` objektum. Támogatott ellenőrzések:
 
 A célszövegben a tanulónak megadandó értékeket `[[dupla szögletes zárójel]]` közé zárva emelheted ki. Például: `Állítsd be az e-mailt: \`[[learner@example.test]]\`.` — az e-mail kiemelt értékként jelenik meg, miközben a parancskontextus kódstílusú marad.
 
+A beépített **Git-identitás beállítása** feladat bármilyen nem üres globális `user.name` és `user.email` értéket elfogad; a súgóban vagy megoldásban szereplő példák nem kötelezőek.
+
 A `config-value` típusnál a `scope` értéke `local` vagy `global`, a `key` pedig a Git-konfiguráció kulcsa legyen. Az ellenőrzés bármilyen nem üres stringet elfogad ehhez a kulcshoz. A `commit-message` ellenőrzés legalább egy új commitot követel meg nem üres, nem csak szóközökből álló üzenettel. Mindkét típusra példa található a [`custom-exercises.json`](./custom-exercises.json) fájlban.
 
 Az `initial` egy opcionális commitobjektum-tömb `id`, `parents`, lokalizált `message` és opcionális `lane` (0–20) mezőkkel. A szülők a tömb korábbi commitjaira hivatkozhatnak, és a branchneveknek kiinduló commitra kell mutatniuk.

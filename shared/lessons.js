@@ -434,23 +434,24 @@ lessons.unshift(
     title: { hu: "Git-identitás beállítása", en: "Configure your Git identity" },
     category: { hu: "GIT BEÁLLÍTÁSOK · 01", en: "GIT CONFIGURATION · 01" },
     description: {
-      hu: "A Git a commitok szerzőjeként a nevet és az e-mail-címet rögzíti. Ezek beállíthatók felhasználói szinten (`--global`) vagy csak az aktuális repositoryhoz.\n\nÁllíts be egy globális nevet és e-mail-címet. A mintacím fenntartott `.test` tartományt használ, nem valódi postafiók.",
-      en: "Git records a name and email address as the author of each commit. These can be configured globally (`--global`) or just for the current repository.\n\nSet a global name and email. The sample address uses the reserved `.test` domain and is not a real mailbox.",
+      hu: "A Git a commitok szerzőjeként a nevet és az e-mail-címet rögzíti. Ezek beállíthatók felhasználói szinten (`--global`) vagy csak az aktuális repositoryhoz.\n\nÁllíts be tetszőleges, nem üres globális nevet és e-mail-címet.",
+      en: "Git records a name and email address as the author of each commit. These can be configured globally (`--global`) or just for the current repository.\n\nChoose any non-empty global name and email address.",
     },
     goal: {
-      hu: 'Állítsd be: `git config --global user.name "[[Learner Example]]"` és `git config --global user.email "[[learner@example.test]]"`.',
-      en: 'Set `git config --global user.name "[[Learner Example]]"` and `git config --global user.email "[[learner@example.test]]"`.',
+      hu: "Állítsd be a globális `user.name` és `user.email` értékét egy általad választott, nem üres stringre.",
+      en: "Set global `user.name` and `user.email` to any non-empty strings of your choice.",
     },
     hint: {
-      hu: 'Ellenőrizd az értékeket a `git config --global --list` vagy a `git config --global --get user.email` paranccsal. Ezek a feladat mintaadatai.',
-      en: 'Verify the values with `git config --global --list` or `git config --global --get user.email`. These are sample values for the exercise.',
+      hu: 'Használd a `git config --global user.name "A saját neved"` és a `git config --global user.email "a-sajat-cimed@example.test"` parancsot. Mindkét érték szabadon választható; ellenőrizd őket a `git config --global --list` paranccsal.',
+      en: 'Run `git config --global user.name "Your Name"` and `git config --global user.email "you@example.test"`. Choose both values freely, then verify them with `git config --global --list`.',
     },
     solution: [
       'git config --global user.name "Learner Example"',
       "git config --global user.email learner@example.test",
     ],
-    check: (s) => s.config.global["user.name"] === "Learner Example"
-      && s.config.global["user.email"] === "learner@example.test",
+    check: (s) => ["user.name", "user.email"].every((key) => (
+      typeof s.config.global[key] === "string" && s.config.global[key].trim().length > 0
+    )),
   }),
   practiceGitConfig({
     title: { hu: "Repository-beállítások", en: "Repository-level settings" },

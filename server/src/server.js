@@ -368,6 +368,13 @@ async function seed(session, lesson, language) {
   const init = await runGit(session, ["init", "--quiet"], { cwd: session.repoDir });
   if (init.code !== 0) throw new Error(`git init failed: ${init.stderr || init.stdout}`);
 
+  if (lesson.id !== "builtin-01") {
+    for (const [key, value] of [["user.name", "Learner"], ["user.email", "learner@example.test"]]) {
+      const identity = await runGit(session, ["config", "--local", key, value], { cwd: session.repoDir });
+      if (identity.code !== 0) throw new Error(`git config ${key} failed: ${identity.stderr || identity.stdout}`);
+    }
+  }
+
   // Build real commits with real content: every seeded commit adds its own
   // file, so later merges, rebases and cherry-picks produce genuine diffs.
   const emptyTree = await runGit(session, ["mktree"], { input: "" });
