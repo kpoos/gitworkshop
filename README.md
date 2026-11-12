@@ -34,11 +34,11 @@ Manage the environment with `./install.sh status`, `./install.sh logs`, `./insta
 
 ## Real commands, verified exercises
 
-The Node server inside the container executes every terminal command with the real `git` binary in a per-session repository under `/workspace`. After each command the server reads the real repository state — branches, commits, configuration, remotes, working-tree status — and rebuilds the commit graph from it.
+The Node server inside the container executes every terminal command with the real `git` binary in one persistent per-session repository under `/workspace`. Every lesson uses this same repository. Lesson changes prepare the next exercise there and preserve earlier history under `refs/git-workshop/archive/`; the active commit graph focuses on the current exercise.
 
-Exercises are verified **on the server against that real repository state**. A task counts as completed only when the container's repository actually satisfies the check *and* at least one real `git` command was executed in the container since the exercise was loaded, as recorded in the server's execution log. Nothing is checked in the browser, so a simulated command cannot complete a task.
+Exercises are verified **on the server against that real repository state**. A hands-on exercise counts as completed only when the container's repository actually satisfies the check *and* at least one real `git` command was executed in the container since the exercise was loaded, as recorded in the server's execution log. Concept lessons are marked complete when you choose to continue. Nothing is checked in the browser, so a simulated command cannot complete a hands-on task.
 
-Seeded lesson commits are tagged with their exercise ids (`C0`, `C1`, …), which means commands from the lesson text such as `git cherry-pick C2` work against real git.
+Seeded lesson commits are tagged with their exercise ids (`C0`, `C1`, …), which means commands from the lesson text such as `git cherry-pick C2` work against real git. **Configure the origin remote** uses the local Gitea repository at `http://gitea:3000/learner/team-demo.git`; once configured, that remote remains available in later lessons. Course progress is also recorded in `.git/git-workshop/progress.json`.
 
 The terminal header has two extra controls. **Check task** re-runs the server-side verification on demand: it reports the evidence (real repository state plus the number of real `git` commands executed since the lesson loaded), marks the current exercise complete when it passes, and on the next press advances to the next task. **Hint** reveals the current exercise step by step in the terminal — first the goal, then the tip, and finally the exact commands to run in the container.
 
@@ -53,7 +53,7 @@ docker compose down      # stop both services, keep practice and Gitea data
 docker compose down -v   # stop and delete both data volumes
 ```
 
-The named `git-workshop-data` volume keeps each session's repositories across container restarts. The separate `gitea-data` volume keeps the local Gitea account and repositories. **Restart** rebuilds the current exercise's repository inside the container; **Progress → Clear Progress** also resets the recorded completions.
+The named `git-workshop-data` volume keeps each session's repository across container restarts. The separate `gitea-data` volume keeps the local Gitea account and repositories. **Restart task** prepares the current exercise in the persistent repository while preserving its prior history. **Reset course** recreates the session repository and clears all completed tasks; it does not change the Gitea repository. **Progress → Clear Progress** clears completion records and returns to the first lesson.
 
 ## Contact and contributions
 
@@ -80,11 +80,11 @@ The app contains 45 command-checked exercises plus guided concept lessons. The b
 
 Concept lessons can be completed with **Next lesson**. Commit, branch, merge, rebase, and cherry-pick exercises use the interactive graph and the container-backed terminal; their completion is verified against the real repository state.
 
-Concept-only lessons use a blue **Understanding** panel, while hands-on tasks use the orange **Your task** panel. The merge-conflict exercise starts with a real unresolved conflict in `settings.txt`; the restore exercise starts with a modified tracked `README.md`. **Restart** recreates each scenario so you can practice the Git operation against a real repository state.
+Concept-only lessons use a blue **Understanding** panel, while hands-on tasks use the orange **Your task** panel. The merge-conflict exercise starts with a real unresolved conflict in `settings.txt`; the restore exercise starts with a modified tracked `README.md`. **Restart task** prepares each scenario in the same repository so you can practice the Git operation against a real repository state.
 
 ## Importing exercises
 
-Select **Import** and choose a `.json`, `.yaml`, or `.yml` file. Imported exercises are appended to the learning path, saved in this browser's local storage, and synced to the container so their checks can be verified server-side too. Importing the same ID twice is rejected. The app accepts up to 200 imported exercises and 1 MB per file. Use **Restart** to reset the active exercise or **Remove** beside the import status to remove all imported exercises.
+Select **Import** and choose a `.json`, `.yaml`, or `.yml` file. Imported exercises are appended to the learning path, saved in this browser's local storage, and synced to the container so their checks can be verified server-side too. Importing the same ID twice is rejected. The app accepts up to 200 imported exercises and 1 MB per file. Use **Restart task** to prepare the active exercise or **Remove** beside the import status to remove all imported exercises.
 
 See [`custom-exercises.json`](./custom-exercises.json) and [`custom-exercises.yaml`](./custom-exercises.yaml) for ready-to-import examples. Both formats use a top-level `lessons` array. Every item requires a unique `id`, localized `title`, `description`, `goal`, and `hint`; localized strings may be a single string (same text in both languages) or an object with `hu` and `en` strings. `category`, `initial`, `branches`, and `current` are optional.
 
@@ -101,9 +101,7 @@ Each exercise has a `check` object. Supported checks:
 
 In a goal string, wrap values learners must supply in `[[double brackets]]` to highlight them distinctly. For example, `Set the email to \`[[learner@example.test]]\`.` renders the email as a highlighted value while keeping the command context in code style.
 
-The built-in **Configure your Git identity** exercise accepts any non-empty global `user.name` and `user.email`; the example values in hints or solutions are not required.
-
-The built-in **Configure the origin remote** exercise also accepts any non-empty repository URL for `origin`; its example URL is only a placeholder.
+The built-in **Configure your Git identity** exercise accepts any non-empty global `user.name` and `user.email`; the example values in hints or solutions are not required. The **Configure the origin remote** exercise requires `origin` to point to the seeded local Gitea `learner/team-demo` repository.
 
 For `config-value`, set `scope` to `local` or `global` and provide the Git config `key`. The check accepts any non-empty string value for that key. The `commit-message` check passes when there is at least one new commit whose message is not empty or whitespace-only. See [`custom-exercises.json`](./custom-exercises.json) for examples of both checks.
 

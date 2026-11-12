@@ -588,19 +588,19 @@ lessons.unshift(
     title: { hu: "Remote origin beállítása", en: "Configure the origin remote" },
     category: { hu: "GIT BEÁLLÍTÁSOK · 03", en: "GIT CONFIGURATION · 03" },
     description: {
-      hu: "A remote egy névvel ellátott kapcsolat egy másik repositoryhoz. Az `origin` a klónozáskor általában automatikusan létrejövő, elterjedt alapértelmezett név.\n\nAdd hozzá az `origin` remote-ot a gyakorló URL-lel, listázd a remote-okat, majd próbáld ki az URL módosítását a `git remote set-url` paranccsal.",
-      en: "A remote is a named connection to another repository. `origin` is the conventional default name, usually created automatically when you clone.\n\nAdd `origin` with the practice URL, list remotes, then try changing its URL with `git remote set-url`.",
+      hu: "A remote egy névvel ellátott kapcsolat egy másik repositoryhoz. Az `origin` a klónozáskor általában automatikusan létrejövő, elterjedt alapértelmezett név.\n\nAdd hozzá az `origin` remote-ot a helyi Gitea `learner/team-demo` repository-jához, majd ellenőrizd a `git remote -v` paranccsal.",
+      en: "A remote is a named connection to another repository. `origin` is the conventional default name, usually created automatically when you clone.\n\nAdd `origin` for the local Gitea `learner/team-demo` repository, then verify it with `git remote -v`.",
     },
     goal: {
-      hu: "Adj hozzá egy `[[origin]]` nevű remote-ot, amely egy általad választott Git repository URL-jére mutat.",
-      en: "Add a remote named `[[origin]]` pointing to any Git repository URL of your choice.",
+      hu: "Adj hozzá egy `[[origin]]` nevű remote-ot, amely a helyi Gitea `learner/team-demo` repository-jára mutat.",
+      en: "Add an `[[origin]]` remote pointing to the local Gitea practice repository.",
     },
     hint: {
-      hu: "Add hozzá a saját repository URL-jével: `git remote add origin <repository-URL>`. Ellenőrizd `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
-      en: "Add it with `git remote add origin <repository-URL>`, replacing the placeholder with your repository's URL. Verify with `git remote -v`. To change it, use `git remote set-url origin <new-URL>`.",
+      hu: "Állítsd be a helyi Gitea gyakorló repository-t: `git remote add origin http://gitea:3000/learner/team-demo.git`. Ellenőrizd a `git remote -v` paranccsal. URL-módosítás: `git remote set-url origin <új-URL>`.",
+      en: "Add the local Gitea practice repository with `git remote add origin http://gitea:3000/learner/team-demo.git`. Verify it with `git remote -v`. To change the URL, use `git remote set-url origin <new-URL>`.",
     },
-    solution: ["git remote add origin https://github.com/example/git-practice.git"],
-    check: (s) => typeof s.remotes.origin === "string" && s.remotes.origin.trim().length > 0,
+    solution: ["git remote add origin http://gitea:3000/learner/team-demo.git"],
+    check: (s) => s.remotes.origin === "http://gitea:3000/learner/team-demo.git",
   }),
 );
 

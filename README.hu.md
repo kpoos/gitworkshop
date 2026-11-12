@@ -32,11 +32,11 @@ A környezet kezeléséhez használd a `./install.sh status`, `./install.sh logs
 
 ## Valós parancsok, ellenőrzött feladatok
 
-A konténeren belüli Node szerver minden terminálparancsot a valódi `git` binárissal hajt végre egy munkamenetenkénti repository-ban a `/workspace` alatt. Parancsonként a szerver kiolvassa a valós repository-állapotot — branchek, commitok, konfiguráció, remoteok, munkakönyvtár-státusz —, és ebből építi újra a commitgráfot.
+A konténeren belüli Node szerver minden terminálparancsot a valódi `git` binárissal hajt végre egyetlen, munkamenetenkénti, a `/workspace` alatt megőrzött repository-ban. Minden lecke ugyanezt a repository-t használja. A leckeváltás ebben készíti elő a következő feladatot; a korábbi branchek és commitok a `refs/git-workshop/archive/` alatt megmaradnak, az aktív commitgráf pedig az aktuális feladatra összpontosít.
 
-A feladatokat **a szerver ellenőrzi a valós repository-állapot alapján**. Egy feladat csak akkor számít teljesítettnek, ha a konténer repository-ja tényleg megfelel az ellenőrzésnek *és* legalább egy valós `git` parancs lefutott a konténerben a lecke betöltése óta, ahogy azt a szerver végrehajtási naplója rögzíti. A böngészőben nem történik ellenőrzés, így szimulált parancssal nem teljesíthető feladat.
+A gyakorlati feladatokat **a szerver ellenőrzi a valós repository-állapot alapján**. Egy ilyen feladat csak akkor számít teljesítettnek, ha a konténer repository-ja tényleg megfelel az ellenőrzésnek *és* legalább egy valós `git` parancs lefutott a konténerben a lecke betöltése óta, ahogy azt a szerver végrehajtási naplója rögzíti. A fogalmi leckék a továbblépés választásakor jelölődnek teljesítettnek. A böngészőben nem történik ellenőrzés, így szimulált paranccsal nem teljesíthető gyakorlati feladat.
 
-A lecke-commitok megkapják a feladat-azonosítókat (`C0`, `C1`, …) címkék formájában, így a leckeszövegben szereplő parancsok, mint a `git cherry-pick C2`, a valós gitben is működnek.
+A lecke-commitok megkapják a feladat-azonosítókat (`C0`, `C1`, …) címkék formájában, így a leckeszövegben szereplő parancsok, mint a `git cherry-pick C2`, a valós gitben is működnek. A **Remote origin beállítása** feladat a helyi Gitea `http://gitea:3000/learner/team-demo.git` repository-ját használja; a beállított remote a későbbi leckékben is megmarad. A kurzus előrehaladását a `.git/git-workshop/progress.json` is rögzíti.
 
 A terminál fejlécében további vezérlők vannak. A **Feladat ellenőrzése** gomb igény szerint újrafuttatja a szerveroldali ellenőrzést: jelenti a bizonyítékokat (valós repository-állapot plusz a lecke betöltése óta végrehajtott valós `git` parancsok száma), teljesítéskor megjelöli az aktuális feladatot, a következő megnyomásra pedig továbblép a következő feladatra. A **Súgás** gomb lépésről lépésre tárja fel az aktuális feladatot a terminálban — először a célt, aztán a tippet, végül a konténerben futtatható pontos parancsokat.
 
@@ -51,7 +51,7 @@ docker compose down      # mindkét szolgáltatás leállítása, az adatok megt
 docker compose down -v   # leállítás és mindkét adatkötet törlése
 ```
 
-A névadott `git-workshop-data` kötet a munkamenetek repository-it, a külön `gitea-data` kötet pedig a helyi Gitea-fiókot és repository-kat őrzi meg a konténerek újraindításai között. Az **Újrakezdés** újraépíti az aktuális feladat repository-ját a konténerben; az **Előrehaladás → Előrehaladás törlése** a rögzített teljesítéseket is visszaállítja.
+A névadott `git-workshop-data` kötet a munkamenetek repository-it, a külön `gitea-data` kötet pedig a helyi Gitea-fiókot és repository-kat őrzi meg a konténerek újraindításai között. A **Feladat újraindítása** az aktuális példát készíti elő a közös repository-ban, a korábbi előzmény megtartásával. A **Kurzus újrakezdése** újra létrehozza a munkamenet repository-ját és törli az összes teljesített feladatot; a Gitea repository-t nem módosítja. Az **Előrehaladás → Előrehaladás törlése** a teljesítésjelöléseket törli és visszalép az első leckére.
 
 ## Kapcsolat és közreműködés
 
@@ -78,11 +78,11 @@ Az alkalmazás 45 parancs-ellenőrzött gyakorlatot és irányított fogalmi lec
 
 A fogalmi leckék a **Következő lecke** gombbal teljesíthetők. A commit, branch, merge, rebase és cherry-pick feladatok az interaktív gráfot és a konténerhez kötött terminált használják; teljesítésüket a valós repository-állapot alapján ellenőrizzük.
 
-A csak fogalmi leckék kék **Megértés** panelt, a gyakorlati feladatok narancssárga **Feladat** panelt kapnak. A merge-konfliktus feladat egy valódi, feloldatlan konfliktussal indul a `settings.txt` fájlban; a restore feladat egy módosított, követett `README.md` fájlt készít elő. Az **Újrakezdés** újra létrehozza ezeket a helyzeteket, így a Git-parancsok valódi repository-állapoton gyakorolhatók.
+A csak fogalmi leckék kék **Megértés** panelt, a gyakorlati feladatok narancssárga **Feladat** panelt kapnak. A merge-konfliktus feladat egy valódi, feloldatlan konfliktussal indul a `settings.txt` fájlban; a restore feladat egy módosított, követett `README.md` fájlt készít elő. A **Feladat újraindítása** ugyanezen repository-ban készíti elő újra ezeket a helyzeteket, így a Git-parancsok valós állapoton gyakorolhatók.
 
 ## Feladatok importálása
 
-Válaszd az **Import** lehetőséget, és jelölj ki egy `.json`, `.yaml` vagy `.yml` fájlt. Az importált feladatok a tanulási útvonal végéhez fűződnek, a böngésző local storage-ében tárolódnak, és a konténerbe is szinkronizálódnak, hogy ellenőrzésük szerveroldalon is történhessen. Az azonos ID kétszeri importálása elutasításra kerül. Az alkalmazás legfeljebb 200 importált feladatot és 1 MB-os fájlt fogad el. Az **Újrakezdés** az aktív feladatot állítja vissza, az importállapot melletti **Eltávolítás** pedig minden importált feladatot töröl.
+Válaszd az **Import** lehetőséget, és jelölj ki egy `.json`, `.yaml` vagy `.yml` fájlt. Az importált feladatok a tanulási útvonal végéhez fűződnek, a böngésző local storage-ében tárolódnak, és a konténerbe is szinkronizálódnak, hogy ellenőrzésük szerveroldalon is történhessen. Az azonos ID kétszeri importálása elutasításra kerül. Az alkalmazás legfeljebb 200 importált feladatot és 1 MB-os fájlt fogad el. A **Feladat újraindítása** az aktív példát készíti elő, az importállapot melletti **Eltávolítás** pedig minden importált feladatot töröl.
 
 Kész importálható példák: [`custom-exercises.json`](./custom-exercises.json) és [`custom-exercises.yaml`](./custom-exercises.yaml). Mindkét formátum felső szintű `lessons` tömböt használ. Minden elemhez egyedi `id`, lokalizált `title`, `description`, `goal` és `hint` szükséges; a lokalizált szöveg lehet egyetlen string (ugyanaz a szöveg mindkét nyelven) vagy `hu` és `en` stringeket tartalmazó objektum. A `category`, `initial`, `branches` és `current` opcionális.
 

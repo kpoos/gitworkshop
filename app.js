@@ -12,8 +12,12 @@ const ui = {
     clearImported: "Eltávolítás",
     clearSuccess: "Az importált feladatok eltávolítva.",
     importError: "Importálási hiba: {message}",
-    reset: "Újrakezdés",
-    resetTitle: "Lecke újrakezdése",
+    reset: "Feladat újraindítása",
+    resetTitle: "Aktuális feladat újraindítása",
+    repoReset: "Kurzus újrakezdése",
+    repoResetTitle: "A teljes repository és előrehaladás visszaállítása",
+    repoResetConfirm: "Biztosan elölről kezded? A gyakorló repository és az összes teljesített feladat törlődik. A Gitea repository nem változik.",
+    repoResetSuccess: "A gyakorló repository és a kurzus előrehaladása visszaállt.",
     path: "TANULÁSI ÚTVONAL",
     lessons: "Leckék",
     courseSummary: "{lessons} lecke · {exercises} gyakorlat",
@@ -39,7 +43,7 @@ const ui = {
     dockerIntro: "Az alkalmazás helyi Docker-konténerekben fut. A terminálba írt parancsok valódi rendszerparancsokként a konténerben hajtódnak végre, és a feladatok ellenőrzése is a konténer valós repository-állapotából történik — nincs szimuláció. A gazda gép fájljai nincsenek becsatolva; a gyakorló repository-kat és a helyi Gitea-adatokat külön Docker-kötetek őrzik meg.",
     dockerStepOne: "A repository gyökérkönyvtárából indítsd el a környezetet:",
     dockerStepTwo: "Nyisd meg a Git műhelyt a 3001-es localhost porton:",
-    dockerStepThree: "A terminálba írt parancsok azonnal a konténerben futnak. Az Újrakezdés gomb újraépíti az aktuális feladat repository-ját; a bal oldali listában lépkedhetsz a leckék között.",
+    dockerStepThree: "A parancsok azonnal a konténerben futnak. A Feladat újraindítása az aktuális példát készíti elő a közös repository-ban; a Kurzus újrakezdése elölről indítja a teljes útvonalat.",
     dockerExample: "Példa valós parancsokkal",
     dockerReset: "A környezet és az összes gyakorlófájl törlése:",
 
@@ -137,8 +141,12 @@ const ui = {
     clearImported: "Remove",
     clearSuccess: "Imported exercises removed.",
     importError: "Import error: {message}",
-    reset: "Restart",
-    resetTitle: "Restart lesson",
+    reset: "Restart task",
+    resetTitle: "Restart the current task",
+    repoReset: "Reset course",
+    repoResetTitle: "Reset the entire repository and course progress",
+    repoResetConfirm: "Start over from scratch? This resets the practice repository and all completed tasks. The Gitea repository is not changed.",
+    repoResetSuccess: "The practice repository and course progress have been reset.",
     path: "LEARNING PATH",
     lessons: "Lessons",
     courseSummary: "{lessons} lessons · {exercises} exercises",
@@ -175,8 +183,12 @@ const ui = {
     clearImported: "Remove",
     clearSuccess: "Imported exercises removed.",
     importError: "Import error: {message}",
-    reset: "Restart",
-    resetTitle: "Restart lesson",
+    reset: "Restart task",
+    resetTitle: "Restart the current task",
+    repoReset: "Reset course",
+    repoResetTitle: "Reset the entire repository and course progress",
+    repoResetConfirm: "Start over from scratch? This resets the practice repository and all completed tasks. The Gitea repository is not changed.",
+    repoResetSuccess: "The practice repository and course progress have been reset.",
     path: "LEARNING PATH",
     lessons: "Lessons",
     courseSummary: "{lessons} lessons · {exercises} exercises",
@@ -201,7 +213,7 @@ const ui = {
     dockerIntro: "The application runs in local Docker containers. Commands typed into the terminal execute as real system commands inside the container, and exercises are verified against the container's real repository state — no simulation. No host files are mounted; separate Docker volumes persist the practice repositories and local Gitea data.",
     dockerStepOne: "From the repository root, start the environment:",
     dockerStepTwo: "Open Git Workshop on localhost port 3001:",
-    dockerStepThree: "Commands you type run inside the container immediately. The Restart button rebuilds the current exercise's repository; use the list on the left to move between lessons.",
+    dockerStepThree: "Commands run inside the container immediately. Restart task prepares the current exercise in the shared repository; Reset course starts the entire path over.",
     dockerExample: "Example with real commands",
     dockerReset: "Delete the environment and all practice files:",
 
@@ -796,6 +808,7 @@ function renderLessons() {
   const content = lessons[lessonIndex].content[language];
   const lesson = lessons[lessonIndex];
   const lessonType = lesson.type || "exercise";
+  $(".lesson-panel").classList.toggle("concept-lesson", lessonType === "reading");
   $("#lesson-category").textContent = content.category;
   $("#lesson-counter").textContent = `${String(lessonIndex + 1).padStart(2, "0")} / ${String(lessons.length).padStart(2, "0")}`;
   $("#lesson-title").textContent = content.title;
@@ -1034,6 +1047,8 @@ function applyLanguage() {
   $("#language-button").setAttribute("aria-label", text.languageAria);
   $("#reset-button").textContent = text.reset;
   $("#reset-button").title = text.resetTitle;
+  $("#repo-reset-button").textContent = text.repoReset;
+  $("#repo-reset-button").title = text.repoResetTitle;
   $("#path-label").textContent = text.path;
   $("#lesson-list").setAttribute("aria-label", text.lessons);
   $("#sidebar-tip").textContent = text.tip;
@@ -1103,6 +1118,38 @@ async function loadLesson(index, options = {}) {
     input.disabled = false;
     $("#verify-button").disabled = false;
     $("#hint-button").disabled = false;
+    input.focus();
+  }
+}
+
+async function resetCourse() {
+  if (!sessionId || commandBusy) return;
+  const input = $("#command-input");
+  input.disabled = true;
+  $("#verify-button").disabled = true;
+  $("#hint-button").disabled = true;
+  $("#repo-reset-button").disabled = true;
+  try {
+    const result = await api("/api/reset", { sessionId, language });
+    lessonIndex = 0;
+    completedLessons.clear();
+    commandHistory = [];
+    commandHistoryIndex = 0;
+    clearProgress();
+    $("#next-lesson").dataset.announced = "";
+    applyServerState(result.state);
+    setWelcome();
+    render();
+    checkLesson();
+    saveProgress();
+    addOutput(t("repoResetSuccess"), "success");
+  } catch (error) {
+    addOutput(t("serverError"), "error");
+  } finally {
+    input.disabled = false;
+    $("#verify-button").disabled = false;
+    $("#hint-button").disabled = false;
+    $("#repo-reset-button").disabled = false;
     input.focus();
   }
 }
@@ -1181,6 +1228,9 @@ $("#command-input").addEventListener("input", () => {
 });
 
 $("#reset-button").addEventListener("click", () => loadLesson(lessonIndex));
+$("#repo-reset-button").addEventListener("click", () => {
+  if (confirm(t("repoResetConfirm"))) resetCourse();
+});
 $("#import-button").addEventListener("click", () => $("#import-file").click());
 $("#clear-imported").addEventListener("click", clearImportedLessons);
 $("#import-file").addEventListener("change", (event) => {
@@ -1194,9 +1244,28 @@ $("#language-button").addEventListener("click", () => {
 $("#prev-lesson").addEventListener("click", () => {
   if (lessonIndex > 0) loadLesson(lessonIndex - 1);
 });
-function advanceLesson() {
+async function advanceLesson() {
   const lesson = lessons[lessonIndex];
   if ((lesson.type || "exercise") === "exercise" && !state?.meta?.verification?.verified) return;
+  if ((lesson.type || "exercise") === "reading") {
+    if (!sessionId || commandBusy) return;
+    commandBusy = true;
+    $("#command-input").disabled = true;
+    $("#next-lesson").disabled = true;
+    $("#verify-button").disabled = true;
+    try {
+      const result = await api("/api/progress", { sessionId, lessonId: lesson.id, language });
+      applyServerState(result.state);
+    } catch (error) {
+      addOutput(t("serverError"), "error");
+      return;
+    } finally {
+      commandBusy = false;
+      $("#command-input").disabled = false;
+      $("#verify-button").disabled = false;
+      processCommandQueue();
+    }
+  }
   completedLessons.add(lessonIndex);
   if (lessonIndex < lessons.length - 1) {
     loadLesson(lessonIndex + 1);
