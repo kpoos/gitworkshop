@@ -1261,6 +1261,7 @@ async function executeInSession(session, command) {
     "readonly __git_workshop_command=$1",
     "shift",
     'if [[ -e "$__git_workshop_state_file" ]]; then source "$__git_workshop_state_file" || exit $?; fi',
+    'source "/home/learner/.bashrc"',
     "shopt -s expand_aliases",
     "__git_workshop_save_state() {",
     "  local __gw_status=$1 __gw_umask",
