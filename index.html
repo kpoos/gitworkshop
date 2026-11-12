@@ -23,6 +23,7 @@
         <button class="button button-quiet" id="reset-button" type="button" title="Lecke újrakezdése">Feladat újraindítása</button>
         <button class="button button-quiet" id="repo-reset-button" type="button" title="A teljes repository és előrehaladás visszaállítása">Kurzus újrakezdése</button>
         <button class="button button-quiet" id="progress-button" type="button" aria-label="Tanulási előrehaladás" data-i18n="progressButton"></button>
+        <a class="button button-quiet" id="open-workshop-link" href="/">Teljes műhely</a>
       </div>
     </header>
 
@@ -89,8 +90,21 @@
               <button class="button button-secondary" id="hint-button" type="button" disabled>Súgás</button>
               <button class="button button-secondary" id="docker-playground-button" type="button">Docker környezet</button>
               <button class="button button-secondary" id="help-button" type="button">Parancsok</button>
+              <a class="button button-secondary" id="terminal-tab-button" href="/?view=terminal" target="_blank" rel="noopener">Terminál új lapon</a>
             </div>
           </div>
+          <section class="editor-frame" id="editor-frame" hidden aria-label="Repository-fájl szerkesztése">
+            <div class="editor-heading">
+              <span class="editor-file-name" id="editor-file-name"></span>
+              <button class="button button-secondary" id="editor-close" type="button">Bezárás</button>
+            </div>
+            <textarea id="editor-content" class="editor-content" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Repository-fájl szerkesztése"></textarea>
+            <div class="editor-footer">
+              <span class="editor-status" id="editor-status" role="status" aria-live="polite"></span>
+              <span class="editor-shortcut">Ctrl+S</span>
+              <button class="button button-primary" id="editor-save" type="button">Fájl mentése</button>
+            </div>
+          </section>
           <div class="terminal-output" id="terminal-output" role="log" aria-live="polite" aria-label="Parancssori kimenet"></div>
           <form class="command-form" id="command-form" autocomplete="off">
             <label for="command-input" class="prompt" id="terminal-prompt">$</label>

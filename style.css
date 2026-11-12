@@ -30,7 +30,7 @@ body {
   font-family: var(--sans);
 }
 
-button, input { font: inherit; }
+button, input, textarea { font: inherit; }
 button { color: inherit; }
 
 .topbar {
@@ -74,6 +74,8 @@ button { color: inherit; }
 .button { border: 1px solid transparent; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 700; transition: .15s ease; }
 .button-quiet { padding: 8px 12px; border-color: var(--border); background: transparent; color: var(--muted); }
 .button-quiet:hover, .button-secondary:hover { border-color: #506072; color: var(--text); }
+#open-workshop-link { display: none; text-decoration: none; }
+#terminal-tab-button { display: inline-flex; align-items: center; text-decoration: none; }
 
 .workspace {
   display: grid;
@@ -235,6 +237,17 @@ h1 { margin: 17px 0 10px; font-size: clamp(24px, 2.2vw, 31px); letter-spacing: -
 .graph-footer .status-dot { width: 6px; height: 6px; }
 
 .terminal-panel { display: flex; flex-direction: column; }
+.terminal-panel.editing .command-form, .terminal-panel.editing .terminal-hint { display: none; }
+.terminal-only .sidebar, .terminal-only .lesson-panel, .terminal-only .graph-panel { display: none; }
+.terminal-only .workspace { grid-template-columns: minmax(0, 1fr); height: calc(100vh - 66px); }
+.terminal-only .playground { grid-template-rows: minmax(0, 1fr); padding: 16px; }
+.terminal-only .terminal-panel { min-height: 0; }
+.terminal-only .terminal-output { font-size: 13px; }
+.terminal-only #command-input { font-size: 13px; }
+.terminal-only .terminal-hint { font-size: 11px; }
+.terminal-only .topbar-actions > :not(#open-workshop-link) { display: none; }
+.terminal-only #open-workshop-link { display: inline-flex; align-items: center; }
+.terminal-only #terminal-tab-button { display: none; }
 .terminal-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .terminal-title { display: flex; align-items: center; gap: 9px; }
 .terminal-actions { display: flex; align-items: center; gap: 16px; }
@@ -245,6 +258,17 @@ h1 { margin: 17px 0 10px; font-size: clamp(24px, 2.2vw, 31px); letter-spacing: -
 .terminal-actions .button { padding: 8px 11px; font-size: 11px; }
 .terminal-actions .verify-button { background: #8ff0d0; color: #0d2b23; box-shadow: 0 0 10px rgba(118, 227, 189, .4); }
 .terminal-actions .verify-button:hover:not(:disabled) { background: #b6ffe8; box-shadow: 0 0 16px rgba(118, 227, 189, .6); }
+.editor-frame { display: flex; flex: 1; flex-direction: column; min-height: 0; padding: 10px 13px 12px; }
+.editor-frame[hidden], .terminal-output[hidden] { display: none !important; }
+.editor-heading, .editor-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; }
+.editor-heading { padding: 0 2px 9px; color: var(--muted); font: 10px var(--mono); }
+.editor-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-heading .button, .editor-footer .button { padding: 7px 10px; font-size: 10px; }
+.editor-content { width: 100%; flex: 1; min-height: 120px; padding: 12px; border: 1px solid var(--border); border-radius: 7px; outline: 0; background: #111820; color: var(--text); font: 12px/1.65 var(--mono); resize: none; tab-size: 2; white-space: pre; overflow: auto; }
+.editor-content:focus { border-color: #4b9279; box-shadow: 0 0 0 2px rgb(118 227 189 / 8%); }
+.editor-footer { padding-top: 9px; color: var(--subtle); font-size: 10px; }
+.editor-status { flex: 1; }
+.editor-shortcut { font-family: var(--mono); }
 .terminal-output { flex: 1; min-height: 0; overflow-y: auto; padding: 11px 16px; font-family: var(--mono); font-size: 10px; line-height: 1.65; scrollbar-color: #344250 transparent; }
 .output-line { white-space: pre-wrap; overflow-wrap: anywhere; }
 .output-command { color: #c4d2df; }
@@ -345,4 +369,10 @@ kbd { padding: 2px 4px; border: 1px solid #36424f; border-radius: 3px; backgroun
   .playground { min-height: 650px; padding: 0 12px 14px; }
   .graph-panel { min-height: 320px; }
   .terminal-panel { min-height: 285px; }
+  .terminal-only .topbar { height: 58px; }
+  .terminal-only .workspace { display: grid; height: calc(100vh - 58px); min-height: 0; }
+  .terminal-only .playground { min-height: 0; padding: 10px; }
+  .terminal-only .terminal-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .terminal-only .terminal-actions { flex-wrap: wrap; }
+  .terminal-only .terminal-output { min-height: 120px; }
 }
