@@ -55,6 +55,10 @@ RUN su - learner -c 'git config --global alias.st status' \
     && su - learner -c 'git config --global user.name "Learner"' \
     && su - learner -c 'git config --global user.email "learner@example.test"'
 
+# Add comprehensive shell aliases from https://gist.github.com/filidorwiese/d228588ee8023c6fdfb24c85979172ab
+COPY bashrc-aliases /tmp/bashrc-aliases
+RUN cat /tmp/bashrc-aliases >> /home/learner/.bashrc && rm /tmp/bashrc-aliases
+
 USER learner
 
 EXPOSE 3000
