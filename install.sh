@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 CONTAINER_NAME="git-workshop"
-HOST_PORT=""
+HOST_PORT=3001
 HEALTH_CHECK_URL="http://localhost:${HOST_PORT}/api/health"
 GITEA_HEALTH_CHECK_URL="http://localhost:3000/api/healthz"
 GITEA_API_URL="http://localhost:3000/api/v1"
@@ -421,7 +421,7 @@ show_help() {
     printf '  ./install.sh status\n'
     printf '  ./install.sh logs\n'
     printf '  ./install.sh stop\n\n'
-    printf '%sAccess:%s Git Workshop uses a random localhost port; Gitea uses http://localhost:3000\n' "$CYAN" "$NC"
+    printf '%sAccess:%s Git Workshop uses http://localhost:3001; Gitea uses http://localhost:3000\n' "$CYAN" "$NC"
     printf '%sData:%s App and Gitea data persist in separate Docker volumes\n' "$CYAN" "$NC"
 }
 

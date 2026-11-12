@@ -26,7 +26,7 @@ Clone the repository, then start the environment from its root:
 ./install.sh start
 ```
 
-The script builds the Docker image, starts Git Workshop and Gitea, seeds two example repositories, waits for both services, and prints their URLs. Git Workshop receives a random available localhost port; Gitea is at <http://localhost:3000>. Both ports are bound to `127.0.0.1`, so they are reachable only from your own machine.
+The script builds the Docker image, starts Git Workshop and Gitea, seeds two example repositories, waits for both services, and prints their URLs. Git Workshop is at <http://localhost:3001>; Gitea is at <http://localhost:3000>. Both ports are bound to `127.0.0.1`, so they are reachable only from your own machine.
 
 The initial startup creates the local Gitea administrator account `learner` and prints a generated password. Save it; it is also stored in the `gitea-data` Docker volume and can be retrieved with `docker compose exec -u git gitea cat /data/gitea/git-workshop-learner-password`. The seeded public repositories are `learner/team-demo` and `learner/feature-project`. The Gitea web UI and its repositories are local-only; from Git Workshop's terminal use the internal Docker hostname, for example `git clone http://gitea:3000/learner/team-demo.git`.
 
@@ -61,7 +61,7 @@ Visit the [GitHub repository](https://github.com/kpoos/gitworkshop).
 
 ## Learning path
 
-The app contains 43 command-checked exercises plus guided concept lessons. The bilingual path progresses from Git fundamentals to team delivery:
+The app contains 45 command-checked exercises plus guided concept lessons. The bilingual path progresses from Git fundamentals to team delivery:
 
 1. Configure global author name and email.
 2. Set repository-local defaults and pull behavior.

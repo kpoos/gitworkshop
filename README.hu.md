@@ -24,7 +24,7 @@ Klónozd a repository-t, majd annak gyökérkönyvtárából indítsd el a körn
 ./install.sh start
 ```
 
-A script felépíti a Docker image-et, elindítja a Git műhelyt és a Giteát, létrehoz két példa-repository-t, megvárja mindkét szolgáltatás indulását, majd kiírja az elérhetőségeket. A Git műhely egy véletlenszerűen kiosztott localhost portot kap; a Gitea a <http://localhost:3000> címen érhető el. Mindkét port a `127.0.0.1` címre van kötve, így a szolgáltatások csak a saját gépedről érhetők el.
+A script felépíti a Docker image-et, elindítja a Git műhelyt és a Giteát, létrehoz két példa-repository-t, megvárja mindkét szolgáltatás indulását, majd kiírja az elérhetőségeket. A Git műhely a <http://localhost:3001>, a Gitea a <http://localhost:3000> címen érhető el. Mindkét port a `127.0.0.1` címre van kötve, így a szolgáltatások csak a saját gépedről érhetők el.
 
 Az első indítás létrehozza a `learner` nevű helyi Gitea-adminisztrátori fiókot, és kiír egy véletlenszerű jelszót. Mentsd el; a `gitea-data` Docker-kötetben is megtalálható a `docker compose exec -u git gitea cat /data/gitea/git-workshop-learner-password` paranccsal. Az előre létrehozott nyilvános repository-k: `learner/team-demo` és `learner/feature-project`. A Gitea webes felülete és repository-jai csak helyben érhetők el; a Git műhely termináljából a belső Docker-gépnevet használd, például: `git clone http://gitea:3000/learner/team-demo.git`.
 
@@ -59,7 +59,7 @@ Látogass el a [GitHub repositoryba](https://github.com/kpoos/gitworkshop).
 
 ## Tanulási útvonal
 
-Az alkalmazás 43 parancs-ellenőrzött gyakorlatot és irányított fogalmi leckéket tartalmaz. A kétnyelvű útvonal a Git alapjaitól a csapat-szállításig halad:
+Az alkalmazás 45 parancs-ellenőrzött gyakorlatot és irányított fogalmi leckéket tartalmaz. A kétnyelvű útvonal a Git alapjaitól a csapat-szállításig halad:
 
 1. Globális szerzői név és e-mail beállítása.
 2. Repository-szintű alapértelmezések és pull-viselkedés beállítása.

@@ -375,8 +375,8 @@ async function seed(session, lesson, language) {
     }
   }
 
-  // Build real commits with real content: every seeded commit adds its own
-  // file, so later merges, rebases and cherry-picks produce genuine diffs.
+  // Build real commits with real content so Git operations produce genuine
+  // diffs; scenario fixtures can edit an existing project file across commits.
   const emptyTree = await runGit(session, ["mktree"], { input: "" });
   const baseTree = emptyTree.code === 0 && emptyTree.stdout.trim() ? emptyTree.stdout.trim() : EMPTY_TREE;
 
@@ -391,11 +391,25 @@ async function seed(session, lesson, language) {
     if (readTree.code !== 0) throw new Error(`git read-tree failed: ${readTree.stderr || readTree.stdout}`);
 
     const subject = commitSubject(commit, language);
-    const blob = await runGit(session, ["hash-object", "-w", "--stdin"], { input: `${subject}\n` });
-    if (blob.code !== 0) throw new Error(`git hash-object failed: ${blob.stderr || blob.stdout}`);
-    const filePath = index === 0 ? "README.md" : `file-${index}.txt`;
-    const update = await runGit(session, ["update-index", "--add", "--cacheinfo", `100644,${blob.stdout.trim()},${filePath}`]);
-    if (update.code !== 0) throw new Error(`git update-index failed: ${update.stderr || update.stdout}`);
+    const scenarioFiles = lesson.scenario?.type === "cherry-pick"
+      ? lesson.scenario.commits?.[commit.id]
+      : null;
+    if (scenarioFiles) {
+      for (const [filePath, content] of Object.entries(scenarioFiles)) {
+        const target = path.resolve(session.repoDir, filePath);
+        if (!isInside(session.repoDir, target)) throw new Error(`Invalid scenario file path: ${filePath}`);
+        const blob = await runGit(session, ["hash-object", "-w", "--stdin"], { input: content });
+        if (blob.code !== 0) throw new Error(`git hash-object failed for ${filePath}: ${blob.stderr || blob.stdout}`);
+        const update = await runGit(session, ["update-index", "--add", "--cacheinfo", `100644,${blob.stdout.trim()},${filePath}`]);
+        if (update.code !== 0) throw new Error(`git update-index failed for ${filePath}: ${update.stderr || update.stdout}`);
+      }
+    } else {
+      const blob = await runGit(session, ["hash-object", "-w", "--stdin"], { input: `${subject}\n` });
+      if (blob.code !== 0) throw new Error(`git hash-object failed: ${blob.stderr || blob.stdout}`);
+      const filePath = index === 0 ? "README.md" : `file-${index}.txt`;
+      const update = await runGit(session, ["update-index", "--add", "--cacheinfo", `100644,${blob.stdout.trim()},${filePath}`]);
+      if (update.code !== 0) throw new Error(`git update-index failed: ${update.stderr || update.stdout}`);
+    }
     const tree = await runGit(session, ["write-tree"]);
     if (tree.code !== 0) throw new Error(`git write-tree failed: ${tree.stderr || tree.stdout}`);
     treeById[commit.id] = tree.stdout.trim();

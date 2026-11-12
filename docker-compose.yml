@@ -4,7 +4,7 @@ services:
     container_name: git-workshop
     hostname: git-workshop
     ports:
-      - "127.0.0.1::3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - git-workshop-data:/workspace
     depends_on:
