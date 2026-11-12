@@ -43,6 +43,18 @@ RUN sed -i 's/^node:/learner:/; s|/home/node|/home/learner|' /etc/passwd \
     && mkdir -p /workspace \
     && chown -R learner:learner /workspace /app
 
+# Configure useful Git aliases for learners (run as learner user)
+RUN su - learner -c 'git config --global alias.st status' \
+    && su - learner -c 'git config --global alias.co checkout' \
+    && su - learner -c 'git config --global alias.br branch' \
+    && su - learner -c 'git config --global alias.ci commit' \
+    && su - learner -c 'git config --global alias.lg "log --oneline --graph --all --decorate"' \
+    && su - learner -c 'git config --global alias.unstage "reset HEAD --"' \
+    && su - learner -c 'git config --global alias.last "log -1 HEAD"' \
+    && su - learner -c 'git config --global alias.visual "!gitk"' \
+    && su - learner -c 'git config --global user.name "Learner"' \
+    && su - learner -c 'git config --global user.email "learner@example.test"'
+
 USER learner
 
 EXPOSE 3000
