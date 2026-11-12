@@ -26,6 +26,39 @@
     return false;
   }
 
+  const cherryPickScenarios = [
+    {
+      file: "src/cart.js",
+      base: "export function total(items) {\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n",
+      fix: "export function total(items) {\n  if (!Array.isArray(items)) return 0;\n  return items.reduce((sum, item) => sum + item.price, 0);\n}\n",
+    },
+    {
+      file: "src/forms.js",
+      base: "export function isValidEmail(email) {\n  return email.includes(\"@\");\n}\n",
+      fix: "export function isValidEmail(email) {\n  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n}\n",
+    },
+    {
+      file: "src/access.js",
+      base: "export function canDeleteProject(user) {\n  return Boolean(user);\n}\n",
+      fix: "export function canDeleteProject(user) {\n  return user?.role === \"admin\";\n}\n",
+    },
+    {
+      file: "src/release.js",
+      base: "export function isReleaseVersion(version) {\n  return version.startsWith(\"v\");\n}\n",
+      fix: "export function isReleaseVersion(version) {\n  return /^v\\d+\\.\\d+\\.\\d+$/.test(version);\n}\n",
+    },
+    {
+      file: "src/messages.js",
+      base: "export const messages = {\n  en: { save: \"Save\" },\n};\n",
+      fix: "export const messages = {\n  en: { save: \"Save\" },\n  hu: { save: \"Mentés\" },\n};\n",
+    },
+    {
+      file: "src/pagination.js",
+      base: "export function pageOffset(page, pageSize) {\n  return (page - 1) * pageSize;\n}\n",
+      fix: "export function pageOffset(page, pageSize, pageCount) {\n  const safePage = Math.max(1, Math.min(page, pageCount));\n  return (safePage - 1) * pageSize;\n}\n",
+    },
+  ];
+
   function createLessons() {
 const lessons = [
   {
@@ -219,18 +252,32 @@ const lessons = [
   },
   {
     type: "exercise",
+    scenario: {
+      type: "cherry-pick",
+      file: cherryPickScenarios[0].file,
+      commits: {
+        C0: {
+          "README.md": "# Local project\n\nReview a focused code fix and integrate it into the release branch.\n",
+          [cherryPickScenarios[0].file]: cherryPickScenarios[0].base,
+        },
+        C1: {
+          "src/catalog.js": "export const catalog = [{ id: \"starter\", active: true }];\n",
+        },
+        C2: { [cherryPickScenarios[0].file]: cherryPickScenarios[0].fix },
+      },
+    },
     content: {
       hu: {
         title: "Cherry-pick", category: "CÉLZOTT ÁTVÉTEL · 08",
-        description: "A `git cherry-pick <commit>` egy kiválasztott commit változtatását új commitként alkalmazza az aktuális ágon. Hasznos például sürgős javítás átvitelére, ha nem akarod az egész feature ágat merge-elni.\n\nA célágon állj, majd add meg az átvenni kívánt commit azonosítóját. Az új commit más azonosítót kap, mert a szülője az aktuális HEAD lesz. Konfliktus esetén oldd fel, stage-eld a fájlokat, majd `git cherry-pick --continue`; megszakításhoz `git cherry-pick --abort`.",
-        goal: "Vedd át a `[[C2]]` javító commitot a `[[main]]` ágra `git cherry-pick [[C2]]` paranccsal.",
-        hint: "Cherry-pick előtt válts a célágra (`main`). Ez egyetlen commitot másol át; nem mozgatja a forráságat, és nem helyettesíti a rendszeres merge-et.",
+        description: "A `git cherry-pick <commit>` egy kiválasztott commit változtatását új commitként alkalmazza az aktuális ágon. Hasznos például sürgős javítás átvitelére, ha nem akarod az egész feature ágat merge-elni.\n\nEbben a helyi projektben a main ágon egy hibás kosárösszegző függvény, a fix ágon pedig annak null-biztos javítása található. A javítás előtt vizsgáld meg a `src/cart.js` fájlt, az ággráfot és a `git show C2 -- src/cart.js` kimenetét. Konfliktus esetén oldd fel, stage-eld a fájlokat, majd `git cherry-pick --continue`; megszakításhoz `git cherry-pick --abort`.",
+        goal: "Vedd át a `[[C2]]` null-biztos javítást a `[[src/cart.js]]` fájlhoz a `[[main]]` ágra.",
+        hint: "Vizsgáld meg a projektet a `git status`, `git log --oneline --all --graph` és `git show C2 -- src/cart.js` parancsokkal. Válts main ágra és cherry-pickeld a C2 commitot. Ellenőrizd a javított kódot a fájlban és azt, hogy a fix ág nem mozdult el.",
       },
       en: {
         title: "Cherry-pick", category: "TARGETED INTEGRATION · 08",
-        description: "`git cherry-pick <commit>` applies one selected commit as a new commit on your current branch. It is useful for bringing in a targeted fix without merging an entire feature branch.\n\nCheck out the destination branch, then provide the commit ID. The new commit gets a different ID because its parent is the current HEAD. If there is a conflict, resolve and stage the files, then run `git cherry-pick --continue`; abort with `git cherry-pick --abort`.",
-        goal: "Bring the `[[C2]]` fix onto `[[main]]` with `git cherry-pick [[C2]]`.",
-        hint: "Switch to the destination (`main`) first. Cherry-pick copies one commit's changes; it does not move the source branch and is not a substitute for regular merges.",
+        description: "`git cherry-pick <commit>` applies one selected commit as a new commit on your current branch. It is useful for bringing in a targeted fix without merging an entire feature branch.\n\nThis local project has a buggy cart-total function on `main` and its null-safe fix on `fix`. Inspect `src/cart.js`, the branch graph, and `git show C2 -- src/cart.js` before applying the fix. If a conflict occurs, resolve and stage the files, then run `git cherry-pick --continue`; abort with `git cherry-pick --abort`.",
+        goal: "Bring the `[[C2]]` null-safety fix for `[[src/cart.js]]` onto the `[[main]]` branch.",
+        hint: "Inspect the project with `git status`, `git log --oneline --all --graph`, and `git show C2 -- src/cart.js`. Switch to `main` and cherry-pick C2. Confirm that the fixed code is in src/cart.js and that the fix branch did not move.",
       },
     },
     initial: [
@@ -244,7 +291,11 @@ const lessons = [
     check: (s) => {
       const head = s.commits.find((commit) => commit.id === s.branches.main);
       const fix = s.commits.find((commit) => commit.id === "C2");
-      return Boolean(head && fix && head.parents.length === 1 && head.parents[0] === "C1" && head.message === fix.message);
+      return Boolean(head && fix
+        && head.parents.length === 1
+        && head.parents[0] === "C1"
+        && head.message === fix.message
+        && s.files?.[cherryPickScenarios[0].file] === cherryPickScenarios[0].fix);
     },
   },
   {
@@ -300,7 +351,7 @@ const lessons = [
   },
 ];
 
-function practiceLesson({ title, description, goal, hint, category, initial, branches, current, check, pendingChange, solution }) {
+function practiceLesson({ title, description, goal, hint, category, initial, branches, current, check, pendingChange, solution, scenario }) {
   return {
     type: "exercise",
     content: {
@@ -311,6 +362,7 @@ function practiceLesson({ title, description, goal, hint, category, initial, bra
     branches,
     current,
     check,
+    ...(scenario ? { scenario } : {}),
     pendingChange: Boolean(pendingChange),
     ...(solution ? { solution } : {}),
   };
@@ -426,17 +478,17 @@ function practiceRebase(title, enTitle, change, enChange) {
   });
 }
 
-function practiceCherryPick(title, enTitle, fix, enFix) {
+function practiceCherryPick(title, enTitle, fix, enFix, scenario) {
   const solution = ["git switch main", "git cherry-pick C2"];
   return practiceLesson({
     title: { hu: title, en: enTitle },
     category: { hu: "CHERRY-PICK · GYAKORLAT", en: "CHERRY-PICK · PRACTICE" },
     description: {
-      hu: "Egy másik ágon elkészült egy önálló javítás. Vedd át kizárólag ezt a commitot a main ágra a teljes ág merge-elése nélkül.",
-      en: "A focused fix is ready on another branch. Bring only that commit onto main without merging the entire branch.",
+      hu: `Egy másik ágon elkészült egy önálló javítás a \`${scenario.file}\` fájlban. Vizsgáld meg a projektet a \`git status\`, \`git log --oneline --all --graph\` és \`git show C2 -- ${scenario.file}\` parancsokkal, majd vedd át kizárólag ezt a commitot a main ágra.`,
+      en: `A focused fix is ready on another branch in \`${scenario.file}\`. Inspect the project with \`git status\`, \`git log --oneline --all --graph\`, and \`git show C2 -- ${scenario.file}\`, then bring only that commit onto main.`,
     },
     goal: { hu: `Válts a \`[[main]]\` ágra, és cherry-pickeld a \`[[C2]]\` commitot („[[${fix}]]”).`, en: `Switch to \`[[main]]\` and cherry-pick commit \`[[C2]]\` ("[[${enFix}]]").` },
-    hint: { hu: "A célágon állva használd: git cherry-pick C2. Az új commit a main HEAD-et kapja szülőként.", en: "On the destination branch, run: git cherry-pick C2. The new commit has main's HEAD as its parent." },
+    hint: { hu: `Ellenőrizd a \`${scenario.file}\` fájlt a cherry-pick előtt és után. A célágon állva futtasd: git cherry-pick C2. Az új commit a main HEAD-et kapja szülőként, a javított kódnak pedig meg kell jelennie a fájlban.`, en: `Inspect \`${scenario.file}\` before and after the operation. On the destination branch, run: git cherry-pick C2. The new commit has main's HEAD as its parent, and the fixed code should appear in the file.` },
     initial: [
       { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
       { id: "C1", parents: ["C0"], message: { hu: "Main előkészítve", en: "Prepare main" }, lane: 0 },
@@ -444,10 +496,28 @@ function practiceCherryPick(title, enTitle, fix, enFix) {
     ],
     branches: { main: "C1", fix: "C2" },
     current: "main",
+    scenario: {
+      type: "cherry-pick",
+      file: scenario.file,
+      commits: {
+        C0: {
+          "README.md": "# Local project\n\nReview a focused code fix and integrate it into the release branch.\n",
+          [scenario.file]: scenario.base,
+        },
+        C1: {
+          "src/catalog.js": "export const catalog = [{ id: \"starter\", active: true }];\n",
+        },
+        C2: { [scenario.file]: scenario.fix },
+      },
+    },
     check: (s) => {
       const head = s.commits.find((c) => c.id === s.branches.main);
       const source = s.commits.find((c) => c.id === "C2");
-      return Boolean(head && source && head.parents[0] === "C1" && head.message === source.message);
+      return Boolean(head && source
+        && head.parents.length === 1
+        && head.parents[0] === "C1"
+        && head.message === source.message
+        && s.files?.[scenario.file] === scenario.fix);
     },
     solution,
   });
@@ -580,7 +650,9 @@ const extraPractice = [
     ["Kiadási javítás átvétele", "Cherry-pick a release fix", "Kiadási hiba javítva", "Fix release issue"],
     ["Egyetlen commit átvétele", "Pick a single commit", "Lokalizáció frissítve", "Update localization"],
     ["Kiválasztott változtatás átvétele", "Pick a selected change", "Határérték javítva", "Fix boundary case"],
-  ].map(([title, enTitle, fix, enFix]) => practiceCherryPick(title, enTitle, fix, enFix)),
+  ].map(([title, enTitle, fix, enFix], index) => (
+    practiceCherryPick(title, enTitle, fix, enFix, cherryPickScenarios[index])
+  )),
 ];
 
 lessons.push(...extraPractice);
