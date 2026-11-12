@@ -614,6 +614,143 @@ const extraPractice = [
     ["Újabb kis változtatás", "Another small change", "Űrlap ellenőrzése", "Validate the form"],
     ["Refaktor commit", "A refactoring commit", "Függvény egyszerűsítve", "Simplify function"],
   ].map(([title, enTitle, message, enMessage]) => practiceCommit(title, enTitle, message, enMessage, 2)),
+  // Stash lessons - after commit practice
+  {
+    type: "exercise",
+    content: {
+      hu: {
+        title: "Stash alapok", category: "STASH · 12",
+        description: "A `git stash` ideiglenesen elmenti a nem commitolt változtatásokat, hogy tiszta munkakönyvtárral tudj átválni ágak között vagy frissíteni.\n\n• `git stash` (vagy `git stash push`) elmenti a working directory és staging area változtatásait.\n• `git stash list` felsorolja a mentett stash-eket (pl. `stash@{0}`, `stash@{1}`).\n• `git stash show` megmutatja a legutóbbi stash diffjét; `git stash show -p` a teljes patch-t.\n• `git stash pop` alkalmazza a legutóbbi stash-t és törli a listából; `git stash apply` alkalmazza de nem törli.\n\nEbben a feladatban van egy félkész funkció a `src/feature.js` fájlban. Mentsd el stash-be, válts a main ágra, majd állítsd vissza a változtatásokat.",
+        goal: "Mentsd el a változtatásokat `git stash`-szel, listázd a `git stash list`-tel, nézd meg a `git stash show`-val, majd állítsd vissza `git stash pop`-pal.",
+        hint: "1. `git status` – látszik a módosított fájl. 2. `git stash` – elmenti. 3. `git stash list` – megmutatja a stash@{0}. 4. `git stash show` – diff. 5. `git stash pop` – visszaállít és törli.",
+      },
+      en: {
+        title: "Stash basics", category: "STASH · 12",
+        description: "`git stash` temporarily shelves uncommitted changes so you can switch branches or pull with a clean working directory.\n\n• `git stash` (or `git stash push`) saves working directory and staging area changes.\n• `git stash list` lists saved stashes (e.g., `stash@{0}`, `stash@{1}`).\n• `git stash show` shows the latest stash diff; `git stash show -p` shows the full patch.\n• `git stash pop` applies the latest stash and removes it from the list; `git stash apply` applies but keeps it.\n\nThis task has a half-finished feature in `src/feature.js`. Stash it, switch to main, then restore the changes.",
+        goal: "Save changes with `git stash`, list with `git stash list`, inspect with `git stash show`, then restore with `git stash pop`.",
+        hint: "1. `git status` – see the modified file. 2. `git stash` – saves it. 3. `git stash list` – shows stash@{0}. 4. `git stash show` – diff. 5. `git stash pop` – restores and removes.",
+      },
+    },
+    initial: [
+      { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
+      { id: "C1", parents: ["C0"], message: { hu: "Main fejlesztés", en: "Main development" }, lane: 0 },
+    ],
+    branches: { main: "C1", feature: "C1" },
+    current: "feature",
+    scenario: {
+      type: "stash-basic",
+      file: "src/feature.js",
+      base: "export function feature() {\n  // TODO: implement\n}\n",
+      workInProgress: "export function feature() {\n  const data = fetchData();\n  return process(data);\n}\n",
+    },
+    check: (s) => {
+      const file = s.files?.["src/feature.js"];
+      return file && file.includes("fetchData") && file.includes("process");
+    },
+    solution: ["git stash", "git stash list", "git stash show", "git stash pop"],
+  },
+  {
+    type: "exercise",
+    content: {
+      hu: {
+        title: "Stash alkalmazása és törlése", category: "STASH · 13",
+        description: "Több stash kezelése: alkalmazás törlés nélkül (`apply`), kiválasztott stash alkalmazása, törlése (`drop`), és az összes törlése (`clear`).\n\n• `git stash apply stash@{n}` alkalmazza az n-edik stash-t anélkül, hogy törölné.\n• `git stash drop stash@{n}` törli az n-edik stash-t.\n• `git stash clear` törli az összes stash-t (visszafordíthatatlan!).\n\nEbben a feladatban két stash van elmentve. Alkalmazd az elsőt `apply`-val, a másodikat `pop`-pal, majd töröld a maradékot.",
+        goal: "Alkalmazd az első stash-t `git stash apply stash@{1}`-gyel, a másodikat `git stash pop`-pal, majd töröld a maradékot `git stash drop`-dal.",
+        hint: "1. `git stash list` – két stash van. 2. `git stash apply stash@{1}` – alkalmazza a régebbit. 3. `git stash pop` – alkalmazza és törli a legújabbat. 4. `git stash drop stash@{0}` – törli a maradékot.",
+      },
+      en: {
+        title: "Stash apply, drop, and clear", category: "STASH · 13",
+        description: "Managing multiple stashes: apply without removing (`apply`), apply a specific stash, remove (`drop`), and remove all (`clear`).\n\n• `git stash apply stash@{n}` applies the n-th stash without removing it.\n• `git stash drop stash@{n}` removes the n-th stash.\n• `git stash clear` removes all stashes (irreversible!).\n\nThis task has two stashes saved. Apply the first with `apply`, the second with `pop`, then remove the remainder.",
+        goal: "Apply the first stash with `git stash apply stash@{1}`, the second with `git stash pop`, then remove the remainder with `git stash drop`.",
+        hint: "1. `git stash list` – two stashes exist. 2. `git stash apply stash@{1}` – applies the older one. 3. `git stash pop` – applies and removes the latest. 4. `git stash drop stash@{0}` – removes the remainder.",
+      },
+    },
+    initial: [
+      { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
+      { id: "C1", parents: ["C0"], message: { hu: "Main fejlesztés", en: "Main development" }, lane: 0 },
+    ],
+    branches: { main: "C1" },
+    current: "main",
+    scenario: {
+      type: "stash-multi",
+      file: "src/utils.js",
+      base: "export function helper() {\n  return 1;\n}\n",
+      stash1: "export function helper() {\n  return 2;\n}\n",
+      stash2: "export function helper() {\n  return 3;\n}\n",
+    },
+    check: (s) => {
+      const file = s.files?.["src/utils.js"];
+      return file && file.includes("return 3");
+    },
+    solution: ["git stash list", "git stash apply stash@{1}", "git stash pop", "git stash drop stash@{0}"],
+  },
+  {
+    type: "exercise",
+    content: {
+      hu: {
+        title: "Stash-ből branch létrehozása", category: "STASH · 14",
+        description: "A `git stash branch <ágnév> stash@{n}` létrehoz egy új ágat a stash commitjáról, alkalmazza a stash-t, és ha sikeres, törli a stash-t. Ez hasznos, ha a stash-elt változtatások már nem alkalmazhatók az aktuális HEAD-re (konfliktus).\n\n• `git stash branch new-feature stash@{0}` – új ág a stash-ból.\n• A stash commitja az alapja az új ágnak, a stash változtatásai pedig alkalmazásra kerülnek.\n\nEbben a feladatban van egy stash, ami konfliktust okozna a main-en. Hozz létre belőle egy új ágat.",
+        goal: "Hozz létre egy `stash-fix` ágat a stash-ból: `git stash branch stash-fix stash@{0}`.",
+        hint: "1. `git stash list` – van egy stash. 2. `git stash branch stash-fix stash@{0}` – létrehozza az ágat, alkalmazza a stash-t, és törli a listából. 3. Ellenőrizd: `git status` és `git log --oneline -1`.",
+      },
+      en: {
+        title: "Create branch from stash", category: "STASH · 14",
+        description: "`git stash branch <branch-name> stash@{n}` creates a new branch from the stash's commit, applies the stash, and removes the stash if successful. This is useful when stashed changes no longer apply cleanly to the current HEAD (conflicts).\n\n• `git stash branch new-feature stash@{0}` – new branch from stash.\n• The stash's commit becomes the base of the new branch, and the stash changes are applied.\n\nThis task has a stash that would conflict on main. Create a new branch from it.",
+        goal: "Create a `stash-fix` branch from the stash: `git stash branch stash-fix stash@{0}`.",
+        hint: "1. `git stash list` – one stash exists. 2. `git stash branch stash-fix stash@{0}` – creates branch, applies stash, removes from list. 3. Verify: `git status` and `git log --oneline -1`.",
+      },
+    },
+    initial: [
+      { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
+      { id: "C1", parents: ["C0"], message: { hu: "Main fejlesztés", en: "Main development" }, lane: 0 },
+      { id: "C2", parents: ["C1"], message: { hu: "További commit", en: "Further commit" }, lane: 0 },
+    ],
+    branches: { main: "C2" },
+    current: "main",
+    scenario: {
+      type: "stash-branch",
+      file: "src/config.js",
+      base: "export const config = { mode: 'stable' };\n",
+      stashContent: "export const config = { mode: 'feature', debug: true };\n",
+    },
+    check: (s) => {
+      const file = s.files?.["src/config.js"];
+      return file && file.includes("debug: true") && s.branches["stash-fix"];
+    },
+    solution: ["git stash list", "git stash branch stash-fix stash@{0}"],
+  },
+  {
+    type: "exercise",
+    content: {
+      hu: {
+        title: "Változtatások feltöltése (push)", category: "TÁVOLI REPOK · 15",
+        description: "A `git push` feltölti a lokális commitokat a távoli repositoryba. Ez szükséges, hogy a csapattársak lássák a változtatásaidat.\n\n• `git push origin <ág>` feltölti az adott ágat az `origin` remote-ra.\n• `git push -u origin <ág>` beállítja az upstream tracking-et, így később elég a `git push`.\n• Ha a távoli ág előrébb van, előbb `git pull` vagy `git fetch` + `git merge`/`git rebase` kell.\n\nEbben a feladatban van egy lokális commit a `feature/push-demo` ágon. Töltsd fel az `origin` remote-ra.",
+        goal: "Töltsd fel a `feature/push-demo` ágat az `origin` remote-ra: `git push -u origin feature/push-demo`.",
+        hint: "1. `git status` – tiszta munkakönyvtár. 2. `git log --oneline -1` – látszik a commit. 3. `git push -u origin feature/push-demo` – feltölti és beállítja az upstream-et.",
+      },
+      en: {
+        title: "Push changes to remote", category: "REMOTES · 15",
+        description: "`git push` uploads local commits to the remote repository. This is needed so teammates can see your changes.\n\n• `git push origin <branch>` uploads the branch to the `origin` remote.\n• `git push -u origin <branch>` sets upstream tracking, so later `git push` works without arguments.\n• If the remote branch is ahead, first `git pull` or `git fetch` + `git merge`/`git rebase`.\n\nThis task has a local commit on `feature/push-demo`. Push it to the `origin` remote.",
+        goal: "Push the `feature/push-demo` branch to `origin`: `git push -u origin feature/push-demo`.",
+        hint: "1. `git status` – clean working directory. 2. `git log --oneline -1` – see the commit. 3. `git push -u origin feature/push-demo` – uploads and sets upstream.",
+      },
+    },
+    initial: [
+      { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
+      { id: "C1", parents: ["C0"], message: { hu: "Main fejlesztés", en: "Main development" }, lane: 0 },
+    ],
+    branches: { main: "C1", "feature/push-demo": "C1" },
+    current: "feature/push-demo",
+    scenario: {
+      type: "push",
+      remote: "origin",
+      remoteUrl: "http://gitea:3000/learner/team-demo.git",
+    },
+    check: (s) => {
+      return s.remotes.origin === "http://gitea:3000/learner/team-demo.git" && s.branches["feature/push-demo"];
+    },
+    solution: ["git push -u origin feature/push-demo"],
+  },
   ...[
     ["Kereső feature ág", "Search feature branch", "feature/search", "feature/search"],
     ["Profil feature ág", "Profile feature branch", "feature/profile", "feature/profile"],
@@ -653,6 +790,7 @@ const extraPractice = [
   ].map(([title, enTitle, fix, enFix], index) => (
     practiceCherryPick(title, enTitle, fix, enFix, cherryPickScenarios[index])
   )),
+
 ];
 
 lessons.push(...extraPractice);
