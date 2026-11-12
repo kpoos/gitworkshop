@@ -97,6 +97,7 @@ Each exercise has a `check` object. Supported checks:
 - `{ "type": "merge-commit", "branch": "main" }` — require a two-parent commit at the branch tip.
 - `{ "type": "rebase", "branch": "feature", "onto": "main" }` — require the feature tip to be based on main.
 - `{ "type": "cherry-pick", "branch": "main", "source": "C2", "onto": "C1" }` — require the selected change at the destination branch tip.
+- `{ "type": "config-value", "scope": "global", "key": "user.name" }` — require a non-empty value for the selected local or global Git config key; the learner chooses the value.
 
 In a goal string, wrap values learners must supply in `[[double brackets]]` to highlight them distinctly. For example, `Set the email to \`[[learner@example.test]]\`.` renders the email as a highlighted value while keeping the command context in code style.
 

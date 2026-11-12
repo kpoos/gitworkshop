@@ -95,6 +95,7 @@ Minden feladathoz tartozik egy `check` objektum. Támogatott ellenőrzések:
 - `{ "type": "merge-commit", "branch": "main" }` — két szülős commitot követel meg az ág csúcsán.
 - `{ "type": "rebase", "branch": "feature", "onto": "main" }` — megköveteli, hogy a feature csúcsa a main-re épüljön.
 - `{ "type": "cherry-pick", "branch": "main", "source": "C2", "onto": "C1" }` — a kijelölt változtatást követeli meg a célágon.
+- `{ "type": "config-value", "scope": "global", "key": "user.name" }` — nem üres értéket követel meg a megadott helyi vagy globális Git-konfigurációs kulcshoz; az értéket a tanuló választja meg.
 
 A célszövegben a tanulónak megadandó értékeket `[[dupla szögletes zárójel]]` közé zárva emelheted ki. Például: `Állítsd be az e-mailt: \`[[learner@example.test]]\`.` — az e-mail kiemelt értékként jelenik meg, miközben a parancskontextus kódstílusú marad.
 
@@ -103,6 +104,8 @@ A beépített **Git-identitás beállítása** feladat bármilyen nem üres glob
 A beépített **Remote origin beállítása** feladat az `origin` remote bármilyen nem üres repository-URL-jét elfogadja; a példában szereplő URL csak helyőrző.
 
 A `config-value` típusnál a `scope` értéke `local` vagy `global`, a `key` pedig a Git-konfiguráció kulcsa legyen. Az ellenőrzés bármilyen nem üres stringet elfogad ehhez a kulcshoz. A `commit-message` ellenőrzés legalább egy új commitot követel meg nem üres, nem csak szóközökből álló üzenettel. Mindkét típusra példa található a [`custom-exercises.json`](./custom-exercises.json) fájlban.
+
+A `commit-message` ellenőrzés akkor teljesül, ha legalább egy új commit üzenete nem üres és nem csak szóközökből áll; az üzenetet a tanuló választja meg.
 
 Az `initial` egy opcionális commitobjektum-tömb `id`, `parents`, lokalizált `message` és opcionális `lane` (0–20) mezőkkel. A szülők a tömb korábbi commitjaira hivatkozhatnak, és a branchneveknek kiinduló commitra kell mutatniuk.
 
