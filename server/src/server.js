@@ -206,6 +206,8 @@ function freshMeta(lessonId, lessonIndex, language, imported) {
     language,
     imported,
     verifiedLessons: [],
+    stage: 0,
+    stageRootShas: [],
     idMap: {},
     nextId: 1,
     execLog: [],
@@ -220,6 +222,24 @@ async function saveMeta(session) {
   const tmp = `${target}.tmp`;
   await fsp.writeFile(tmp, JSON.stringify(session.meta, null, 2));
   await fsp.rename(tmp, target);
+
+  const gitDir = path.join(session.repoDir, ".git");
+  try {
+    await fsp.access(gitDir);
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  const progressDir = path.join(gitDir, "git-workshop");
+  await fsp.mkdir(progressDir, { recursive: true });
+  const progressPath = path.join(progressDir, "progress.json");
+  const progressTmp = `${progressPath}.tmp`;
+  await fsp.writeFile(progressTmp, JSON.stringify({
+    lessonId: session.meta.lessonId,
+    lessonIndex: session.meta.lessonIndex,
+    verifiedLessons: session.meta.verifiedLessons,
+  }, null, 2));
+  await fsp.rename(progressTmp, progressPath);
 }
 
 function normalizeLanguage(value) {
@@ -341,7 +361,45 @@ function commitSubject(commit, language) {
   return (message && (message[language] || message.en || message.hu)) || "Commit";
 }
 
-async function seed(session, lesson, language) {
+async function archiveBranches(session, stage) {
+  const refs = await runGit(session, [
+    "for-each-ref",
+    "refs/heads",
+    "--format=%(refname:short)\x1f%(objectname)",
+  ]);
+  if (refs.code !== 0) throw new Error(`git for-each-ref failed: ${refs.stderr || refs.stdout}`);
+  for (const line of refs.stdout.split("\n").filter(Boolean)) {
+    const [name, sha] = line.split("\x1f");
+    const archived = await runGit(session, ["update-ref", `refs/git-workshop/archive/${stage}/${name}`, sha]);
+    if (archived.code !== 0) throw new Error(`Failed to archive branch ${name}: ${archived.stderr || archived.stdout}`);
+    const removed = await runGit(session, ["update-ref", "-d", `refs/heads/${name}`]);
+    if (removed.code !== 0) throw new Error(`Failed to archive branch ${name}: ${removed.stderr || removed.stdout}`);
+  }
+}
+
+async function clearWorkingTree(repoDir) {
+  for (const entry of await fsp.readdir(repoDir)) {
+    if (entry !== ".git") await fsp.rm(path.join(repoDir, entry), { recursive: true, force: true });
+  }
+}
+
+async function clearGitOperationState(repoDir) {
+  const gitDir = path.join(repoDir, ".git");
+  for (const entry of [
+    "MERGE_HEAD",
+    "MERGE_MSG",
+    "MERGE_MODE",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+    "sequencer",
+    "rebase-apply",
+    "rebase-merge",
+  ]) {
+    await fsp.rm(path.join(gitDir, entry), { recursive: true, force: true });
+  }
+}
+
+async function seed(session, lesson, language, { resetRepository = false } = {}) {
   const initial = lesson.initial || [{
     id: "C0",
     parents: [],
@@ -350,19 +408,35 @@ async function seed(session, lesson, language) {
   }];
   const branches = lesson.branches || { main: initial.at(-1).id };
   const current = lesson.current || Object.keys(branches)[0] || "main";
+  const imported = session.meta.imported;
+  const verifiedLessons = resetRepository ? [] : [...(session.meta.verifiedLessons || [])];
+  let previousHead = null;
+  const stage = resetRepository ? 0 : (session.meta.stage || 0) + 1;
 
-  // Clear everything from the session directory except the persisted meta,
-  // including the repository, the session-level git config and any files the
-  // learner created at ~.
-  for (const entry of await fsp.readdir(session.dir)) {
-    if (entry === "meta.json") continue;
-    await fsp.rm(path.join(session.dir, entry), { recursive: true, force: true });
+  if (resetRepository) {
+    for (const entry of await fsp.readdir(session.dir)) {
+      if (entry !== "meta.json") await fsp.rm(path.join(session.dir, entry), { recursive: true, force: true });
+    }
+  } else {
+    const head = await runGit(session, ["rev-parse", "--verify", "HEAD"]);
+    if (head.code !== 0) throw new Error(`Cannot preserve repository history before loading a lesson: ${head.stderr || head.stdout}`);
+    previousHead = head.stdout.trim();
+    await archiveBranches(session, stage);
+    await clearWorkingTree(session.repoDir);
+    await clearGitOperationState(session.repoDir);
+    const tags = await runGit(session, ["for-each-ref", "refs/tags", "--format=%(refname:short)"]);
+    if (tags.code !== 0) throw new Error(`git for-each-ref tags failed: ${tags.stderr || tags.stdout}`);
+    for (const tag of tags.stdout.split("\n").filter((name) => /^C\d+$/.test(name))) {
+      const removed = await runGit(session, ["tag", "-d", tag]);
+      if (removed.code !== 0) throw new Error(`Failed to replace lesson tag ${tag}: ${removed.stderr || removed.stdout}`);
+    }
   }
   await fsp.mkdir(session.repoDir, { recursive: true });
 
   session.meta = {
-    ...freshMeta(lesson.id, lessonClientIndex(session, lesson), language, session.meta.imported),
-    verifiedLessons: session.meta.verifiedLessons || [],
+    ...freshMeta(lesson.id, lessonClientIndex(session, lesson), language, imported),
+    verifiedLessons,
+    stage,
   };
 
   const init = await runGit(session, ["init", "--quiet"], { cwd: session.repoDir });
@@ -416,6 +490,9 @@ async function seed(session, lesson, language) {
 
     const args = ["commit-tree", treeById[commit.id]];
     for (const parentId of commit.parents || []) args.push("-p", idToSha[parentId]);
+    if (!resetRepository && index === 0 && !(commit.parents || []).length && previousHead) {
+      args.push("-p", previousHead);
+    }
     args.push("-m", subject);
     const result = await runGit(session, args, {
       cwd: session.repoDir,
@@ -485,6 +562,9 @@ async function seed(session, lesson, language) {
   }
 
   session.meta.idMap = Object.fromEntries(Object.entries(idToSha).map(([id, sha]) => [sha, id]));
+  session.meta.stageRootShas = initial
+    .filter((commit) => !(commit.parents || []).length)
+    .map((commit) => idToSha[commit.id]);
   session.meta.nextId = Math.max(0, ...initial.map((commit) => (
     /^C\d+$/.test(commit.id) ? Number(commit.id.slice(1)) : 0
   ))) + 1;
@@ -582,15 +662,18 @@ function computeLanes(commits, branchTips, current, detached) {
 async function buildState(session) {
   const meta = session.meta;
 
-  const log = await runGit(session, ["log", "--all", "--topo-order", "--reverse", "--format=%H%x1f%P%x1f%s"]);
+  const log = await runGit(session, ["log", "--branches", "HEAD", "--topo-order", "--reverse", "--format=%H%x1f%P%x1f%s"]);
   const commits = [];
+  const parentsBySha = new Map();
   if (log.code === 0) {
     for (const line of log.stdout.split("\n")) {
       if (!line.trim()) continue;
       const [sha, parentsRaw, ...subjectParts] = line.split("\x1f");
       const subject = subjectParts.join("\x1f");
+      const parentShas = (parentsRaw || "").split(" ").filter(Boolean);
+      parentsBySha.set(sha, parentShas);
       if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
-      const parents = (parentsRaw || "").split(" ").filter(Boolean).map((parentSha) => {
+      const parents = parentShas.map((parentSha) => {
         if (!meta.idMap[parentSha]) meta.idMap[parentSha] = `C${meta.nextId++}`;
         return meta.idMap[parentSha];
       });
@@ -608,6 +691,35 @@ async function buildState(session) {
       if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
       branches[name] = meta.idMap[sha];
       branchTips[name] = meta.idMap[sha];
+    }
+  }
+
+  const taskRoots = new Set(meta.stageRootShas || []);
+  if (taskRoots.size) {
+    const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
+    const activeShas = new Set();
+    const stack = [
+      ...Object.values(branchTips).map((id) => commits.find((commit) => commit.id === id)?.sha),
+    ];
+    const headResult = await runGit(session, ["rev-parse", "-q", "--verify", "HEAD"]);
+    if (headResult.code === 0) stack.push(headResult.stdout.trim());
+
+    while (stack.length) {
+      const sha = stack.pop();
+      if (!sha || activeShas.has(sha)) continue;
+      const commit = commitsBySha.get(sha);
+      if (!commit) continue;
+      activeShas.add(sha);
+      if (taskRoots.has(sha)) continue;
+      stack.push(...(parentsBySha.get(sha) || []));
+    }
+
+    const activeIds = new Set(commits
+      .filter((commit) => activeShas.has(commit.sha))
+      .map((commit) => commit.id));
+    for (let index = commits.length - 1; index >= 0; index -= 1) {
+      if (!activeShas.has(commits[index].sha)) commits.splice(index, 1);
+      else commits[index].parents = commits[index].parents.filter((parent) => activeIds.has(parent));
     }
   }
 
@@ -735,7 +847,6 @@ function verify(session, state) {
   if (isExercise) {
     const position = meta.verifiedLessons.indexOf(lesson.id);
     if (verified && position === -1) meta.verifiedLessons.push(lesson.id);
-    if (!verified && position !== -1) meta.verifiedLessons.splice(position, 1);
   }
 
   return {
@@ -1285,7 +1396,7 @@ async function handleSessionCreate(payload) {
       applySources(session, payload.sources);
       session.meta.language = language;
       const lesson = resolveLessonByIndex(session, payload.lessonIndexHint) || builtinLessons[0];
-      await seed(session, lesson, language);
+      await seed(session, lesson, language, { resetRepository: true });
     } else {
       applySources(session, payload.sources);
       session.meta.language = language;
@@ -1331,6 +1442,45 @@ async function handleLesson(session, payload) {
     verifiedLessons: [...session.meta.verifiedLessons],
     state,
     verification,
+  };
+}
+
+async function handleCourseReset(session, payload) {
+  const language = normalizeLanguage(payload.language);
+  const imported = session.meta.imported;
+  session.meta.language = language;
+  const lesson = builtinLessons[0];
+  await seed(session, lesson, language, { resetRepository: true });
+  session.meta.imported = imported;
+  const { state, verification } = await snapshot(session);
+  return {
+    lessonId: lesson.id,
+    lessonIndex: 0,
+    verifiedLessons: [...session.meta.verifiedLessons],
+    importedSources: session.meta.imported || [],
+    state,
+    verification,
+  };
+}
+
+async function handleProgress(session, payload) {
+  const lessonId = typeof payload.lessonId === "string" ? payload.lessonId : "";
+  const lesson = builtinLessons.find((item) => item.id === lessonId)
+    || importLessons(session).find((item) => item.id === lessonId);
+  if (!lesson || lesson.id !== session.meta.lessonId) {
+    throw httpError(400, "unknown-lesson", "Only the current lesson can be marked complete");
+  }
+  if ((lesson.type || "exercise") === "exercise" && !session.meta.verifiedLessons.includes(lesson.id)) {
+    throw httpError(409, "unverified-lesson", "Exercise completion must be verified first");
+  }
+  if (!session.meta.verifiedLessons.includes(lesson.id)) {
+    session.meta.verifiedLessons.push(lesson.id);
+  }
+  if (payload.language) session.meta.language = normalizeLanguage(payload.language);
+  const { state } = await snapshot(session);
+  return {
+    state,
+    verifiedLessons: [...session.meta.verifiedLessons],
   };
 }
 
@@ -1409,6 +1559,18 @@ const server = http.createServer(async (req, res) => {
       const payload = await readJson(req);
       const session = await requireSession(payload);
       sendJson(res, 200, await enqueue(session, () => handleLesson(session, payload)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/reset") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleCourseReset(session, payload)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/progress") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleProgress(session, payload)));
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/command") {

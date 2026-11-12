@@ -153,6 +153,10 @@ button { color: inherit; }
 .sidebar-footer a:hover { color: var(--accent); text-decoration: underline; }
 
 .lesson-panel { padding: 39px 27px 28px; border-right: 1px solid var(--border); }
+.lesson-panel.concept-lesson { background: linear-gradient(160deg, rgb(29 48 70 / 34%), transparent 58%); }
+.concept-lesson .eyebrow { color: var(--blue); }
+.concept-lesson .concept-card { border-color: #3b5876; background: rgb(29 48 70 / 35%); }
+.concept-lesson .concept-heading { color: #a9d2ff; }
 .lesson-meta { display: flex; align-items: center; justify-content: space-between; }
 .eyebrow { color: var(--accent); }
 .lesson-counter { color: var(--subtle); font-family: var(--mono); font-size: 10px; }
