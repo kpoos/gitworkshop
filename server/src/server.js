@@ -27,6 +27,7 @@ const MAX_OUTPUT_BYTES = 200_000;
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_IMPORTS = 200;
 const MAX_COMMAND_LENGTH = 10_000;
+const MAX_EDITOR_FILE_BYTES = 1_000_000;
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
@@ -1150,6 +1151,70 @@ function isInside(root, target) {
   return resolvedTarget === resolvedRoot || resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`);
 }
 
+async function resolveEditorTarget(session, requestedPath) {
+  if (typeof requestedPath !== "string" || !requestedPath || path.isAbsolute(requestedPath)) {
+    throw httpError(400, "invalid-editor-path", "Editor path must be relative to the repository");
+  }
+  const repoDir = await fsp.realpath(session.repoDir);
+  const target = path.resolve(repoDir, requestedPath);
+  const gitDir = path.join(repoDir, ".git");
+  if (!isInside(repoDir, target) || target === repoDir || isInside(gitDir, target)) {
+    throw httpError(400, "invalid-editor-path", "The editor can only access files in the repository working tree");
+  }
+
+  let realParent;
+  try {
+    realParent = await fsp.realpath(path.dirname(target));
+  } catch (error) {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") {
+      throw httpError(400, "invalid-editor-path", "The editor file's parent directory does not exist");
+    }
+    throw error;
+  }
+  if (!isInside(repoDir, realParent)) {
+    throw httpError(400, "invalid-editor-path", "The editor cannot access files outside the repository");
+  }
+
+  let actualPath = path.join(realParent, path.basename(target));
+  try {
+    const linkStat = await fsp.lstat(target);
+    if (linkStat.isSymbolicLink()) {
+      actualPath = await fsp.realpath(target);
+      if (!isInside(repoDir, actualPath) || isInside(gitDir, actualPath)) {
+        throw httpError(400, "invalid-editor-path", "The editor cannot access files outside the repository");
+      }
+    }
+    const stat = await fsp.stat(actualPath);
+    if (!stat.isFile()) throw httpError(400, "invalid-editor-path", "The editor target must be a regular file");
+    if (stat.size > MAX_EDITOR_FILE_BYTES) throw httpError(413, "editor-file-too-large", `Editor files are limited to ${MAX_EDITOR_FILE_BYTES} bytes`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  return {
+    path: actualPath,
+    relativePath: path.relative(repoDir, actualPath),
+  };
+}
+
+async function loadEditorFile(session, absolutePath) {
+  if (!path.isAbsolute(absolutePath)) {
+    throw httpError(400, "invalid-editor-path", "Editor path must be absolute");
+  }
+  const repoDir = await fsp.realpath(session.repoDir);
+  if (!isInside(repoDir, absolutePath)) {
+    throw httpError(400, "invalid-editor-path", "The editor can only access files in the repository working tree");
+  }
+  const file = await resolveEditorTarget(session, path.relative(repoDir, absolutePath));
+  let content = "";
+  try {
+    content = await fsp.readFile(file.path, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  return { path: file.relativePath, content };
+}
+
 function sessionCwd(session) {
   const stored = session.meta.cwd || "repo";
   return path.isAbsolute(stored) ? path.resolve(stored) : path.resolve(session.dir, stored);
@@ -1252,6 +1317,7 @@ async function executeInSession(session, command) {
 
   const fields = result.control.split("\0");
   let finalCwd = null;
+  let editorPath = null;
   for (let index = 0; index + 1 < fields.length; index += 2) {
     if (fields[index] === "git") {
       const exitCode = Number(fields[index + 1]);
@@ -1265,6 +1331,8 @@ async function executeInSession(session, command) {
       }
     } else if (fields[index] === "cwd") {
       finalCwd = fields[index + 1];
+    } else if (fields[index] === "editor") {
+      editorPath = fields[index + 1];
     }
   }
 
@@ -1275,6 +1343,7 @@ async function executeInSession(session, command) {
     error: result.code !== 0,
     exitCode: result.code,
     execution: session.meta.execLog.at(-1) || null,
+    editorPath,
   };
 }
 
@@ -1529,12 +1598,55 @@ async function handleCommand(session, payload) {
 
   const executed = await executeInSession(session, command);
   const { state, verification } = await snapshot(session);
+  const editor = executed.editorPath
+    ? await loadEditorFile(session, executed.editorPath)
+    : null;
 
   return {
     output: executed.output,
     error: Boolean(executed.error),
     code: null,
     execution: executed.execution,
+    state,
+    verification,
+    verifiedLessons: [...session.meta.verifiedLessons],
+    editor,
+  };
+}
+
+async function handleEditorSave(session, payload) {
+  const { filePath, content } = payload || {};
+  if (typeof filePath !== "string" || typeof content !== "string") {
+    throw httpError(400, "invalid-editor-save", "Editor save needs a file path and text content");
+  }
+  if (Buffer.byteLength(content, "utf8") > MAX_EDITOR_FILE_BYTES) {
+    throw httpError(413, "editor-file-too-large", `Editor files are limited to ${MAX_EDITOR_FILE_BYTES} bytes`);
+  }
+  if (content.includes("\0")) {
+    throw httpError(400, "invalid-editor-content", "Editor content cannot contain NUL characters");
+  }
+
+  const file = await resolveEditorTarget(session, filePath);
+  let handle;
+  try {
+    handle = await fsp.open(
+      file.path,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+      0o666,
+    );
+    await handle.writeFile(content, "utf8");
+  } catch (error) {
+    if (error.code === "ELOOP") {
+      throw httpError(400, "invalid-editor-path", "The editor cannot write through a symbolic link");
+    }
+    throw error;
+  } finally {
+    if (handle) await handle.close();
+  }
+  const { state, verification } = await snapshot(session);
+  return {
+    filePath: file.relativePath,
+    content,
     state,
     verification,
     verifiedLessons: [...session.meta.verifiedLessons],
@@ -1604,6 +1716,12 @@ const server = http.createServer(async (req, res) => {
       const payload = await readJson(req);
       const session = await requireSession(payload);
       sendJson(res, 200, await enqueue(session, () => handleCommand(session, payload)));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/editor/save") {
+      const payload = await readJson(req);
+      const session = await requireSession(payload);
+      sendJson(res, 200, await enqueue(session, () => handleEditorSave(session, payload)));
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/verify") {

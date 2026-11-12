@@ -37,6 +37,9 @@ const ui = {
     repoStatus: "Munkakönyvtár tiszta",
     detachedStatus: "Leválasztott HEAD",
     terminal: "Parancssor",
+    terminalTab: "Terminál új lapon",
+    terminalTabAria: "Terminál megnyitása külön böngészőlapon",
+    openWorkshop: "Teljes műhely",
     dockerPlayground: "Docker környezet",
     dockerTitle: "Valódi Git a helyi Dockerben",
     dockerKicker: "HELYI DOCKER FUTTATÓKÖRNYEZET",
@@ -72,6 +75,13 @@ const ui = {
     verifyFailState: "✗ Még nem teljesül: a konténer repository-ja nem felel meg a feladat feltételének. Kérj újabb hintet a Súgás gombbal.",
     verifyFailCommands: "✗ A feltétel megfelelne, de a lecke betöltése óta nem futott valós git parancs a konténerben. Futtass egy valós git parancsot.",
     example: 'Példa: git commit -m "Első változtatás"',
+    editorSave: "Fájl mentése",
+    editorClose: "Bezárás",
+    editorReady: "Szerkesztésre kész",
+    editorSaved: "Mentve a repository-ba",
+    editorSaveFailed: "A fájl mentése nem sikerült.",
+    editorCloseConfirm: "A módosításaid még nincsenek elmentve. Bezárod a szerkesztőt mentés nélkül?",
+    editorAria: "Repository-fájl szerkesztése",
 
 
 
@@ -113,7 +123,7 @@ const ui = {
     completed: "Szép munka — teljesítetted a feladatot. Léphetsz tovább a következő leckére.",
     allCompleted: "Szép munka — teljesítetted az utolsó leckét is. Most már szabadon gyakorolhatsz.",
     helpFirst: 'Bash: ls ~/  ·  echo "$HOME"  ·  cd ~/repo  ·  git status  ·  git log --oneline',
-    helpSecond: 'Változók, idézőjelek, globok, csővezetékek, átirányítások, parancshelyettesítés és parancsláncolás is használható. A parancsok a konténerben futnak.',
+    helpSecond: 'Változók, idézőjelek, globok, csővezetékek, átirányítások, parancshelyettesítés és parancsláncolás is használható. A `vi <fájl>` a repository szerkesztőjét nyitja meg; a parancsok a konténerben futnak.',
     commitCount: "{count} commit",
     language: "EN",
     languageAria: "Switch language to English",
@@ -207,6 +217,9 @@ const ui = {
     repoStatus: "Working tree clean",
     detachedStatus: "Detached HEAD",
     terminal: "Terminal",
+    terminalTab: "Open in new tab",
+    terminalTabAria: "Open the terminal in a separate browser tab",
+    openWorkshop: "Full workshop",
     dockerPlayground: "Docker environment",
     dockerTitle: "Real Git in local Docker",
     dockerKicker: "LOCAL DOCKER ENVIRONMENT",
@@ -242,6 +255,13 @@ const ui = {
     verifyFailState: "✗ Not complete yet: the container repository does not satisfy the task. Ask for another hint with the Hint button.",
     verifyFailCommands: "✗ The state would match, but no real git command has run in the container since the lesson loaded. Run a real git command.",
     example: 'Example: git commit -m "First change"',
+    editorSave: "Save file",
+    editorClose: "Close",
+    editorReady: "Ready to edit",
+    editorSaved: "Saved to repository",
+    editorSaveFailed: "Could not save the file.",
+    editorCloseConfirm: "You have unsaved changes. Close the editor without saving?",
+    editorAria: "Edit repository file",
 
 
 
@@ -283,7 +303,7 @@ const ui = {
     completed: "Nice work — task complete. You can move on to the next lesson.",
     allCompleted: "Nice work — you completed the final lesson. Feel free to keep practicing.",
     helpFirst: 'Bash: ls ~/  ·  echo "$HOME"  ·  cd ~/repo  ·  git status  ·  git log --oneline',
-    helpSecond: 'Variables, quoting, globs, pipes, redirection, command substitution, and command chaining are supported. Commands run inside the container.',
+    helpSecond: 'Variables, quoting, globs, pipes, redirection, command substitution, and command chaining are supported. Use `vi <file>` to edit a repository file in the integrated editor. Commands run inside the container.',
     commitCount: "{count} commits",
     language: "HU",
     languageAria: "Váltás magyar nyelvre",
@@ -466,6 +486,8 @@ const lessonList = $("#lesson-list");
 const graph = $("#graph");
 const terminal = $("#terminal-output");
 let language = "en";
+const terminalOnly = new URLSearchParams(location.search).get("view") === "terminal";
+document.body.classList.toggle("terminal-only", terminalOnly);
 const t = (key, values = {}) => Object.entries(values).reduce(
   (text, [name, value]) => text.replaceAll(`{${name}}`, value),
   ui[language][key],
@@ -479,6 +501,8 @@ let commandBusy = false;
 const commandQueue = [];
 let lastTabCompletion = null;
 let hintStep = 0;
+let editorFilePath = null;
+let editorSavedContent = "";
 const completedLessons = new Set();
 
 async function api(pathname, body) {
@@ -489,13 +513,16 @@ async function api(pathname, body) {
   };
   const response = await fetch(pathname, options);
   if (!response.ok) {
-    let code = null;
+    let errorPayload = null;
     try {
-      code = (await response.json()).code || null;
+      errorPayload = await response.json();
     } catch {
-      code = null;
+      errorPayload = null;
     }
-    throw Object.assign(new Error(`HTTP ${response.status}`), { code });
+    throw Object.assign(new Error(errorPayload?.error || `HTTP ${response.status}`), {
+      code: errorPayload?.code || null,
+      status: response.status,
+    });
   }
   return response.json();
 }
@@ -512,7 +539,7 @@ function setWelcome() {
   terminal.replaceChildren();
   addOutput(`${language === "hu" ? "Git műhely" : "Git Workshop"} — ${lessons[lessonIndex].content[language].title}`, "success");
   const containerId = state?.meta?.container;
-  if (containerId) addOutput(t("containerNote", { id: containerId.slice(0, 12) }));
+  if (containerId) addOutput(t("containerNote", { id: containerId }));
   addOutput(t("welcome"));
   if (lessonIndex === 0) addOutput(t("example"));
 }
@@ -574,6 +601,7 @@ async function processCommandQueue() {
         } else if (result.output) {
           addOutput(result.output, result.error ? "error" : "result");
         }
+        if (result.editor) openEditor(result.editor);
         if (requestedLesson === lessonIndex) {
           applyServerState(result.state);
           render();
@@ -581,11 +609,66 @@ async function processCommandQueue() {
           saveProgress();
         }
       } catch (error) {
-        addOutput(t("serverError"), "error");
+        const editorError = ["invalid-editor-path", "editor-file-too-large"].includes(error.code);
+        addOutput(editorError ? error.message : t("serverError"), "error");
       }
     }
   } finally {
     commandBusy = false;
+  }
+}
+
+function openEditor(file) {
+  editorFilePath = file.path;
+  editorSavedContent = file.content;
+  $("#editor-file-name").textContent = file.path;
+  $("#editor-content").value = file.content;
+  $("#editor-status").textContent = t("editorReady");
+  $("#editor-frame").hidden = false;
+  $(".terminal-panel").classList.add("editing");
+  terminal.hidden = true;
+  $("#command-input").disabled = true;
+  $("#editor-content").focus();
+}
+
+function closeEditor() {
+  if (!editorFilePath) return true;
+  if ($("#editor-content").value !== editorSavedContent && !confirm(t("editorCloseConfirm"))) return false;
+  editorFilePath = null;
+  $("#editor-frame").hidden = true;
+  $(".terminal-panel").classList.remove("editing");
+  terminal.hidden = false;
+  $("#command-input").disabled = false;
+  $("#command-input").focus();
+  return true;
+}
+
+async function saveEditorFile() {
+  if (!sessionId || !editorFilePath || commandBusy) return;
+  commandBusy = true;
+  $("#editor-save").disabled = true;
+  $("#editor-status").textContent = t("editorReady");
+  try {
+    const result = await api("/api/editor/save", {
+      sessionId,
+      filePath: editorFilePath,
+      content: $("#editor-content").value,
+    });
+    editorFilePath = result.filePath;
+    editorSavedContent = result.content;
+    applyServerState(result.state);
+    render();
+    checkLesson();
+    saveProgress();
+    $("#editor-status").textContent = t("editorSaved");
+  } catch (error) {
+    $("#editor-status").textContent = t("editorSaveFailed");
+    addOutput(`${t("editorSaveFailed")} ${error.message}`, "error");
+  } finally {
+    commandBusy = false;
+    $("#editor-save").disabled = false;
+    processCommandQueue();
+    $("#editor-content").focus();
   }
 }
 
@@ -1062,6 +1145,13 @@ function applyLanguage() {
   $("#graph-legend").textContent = text.graphLegend;
   $("#graph").setAttribute("aria-label", text.graphAria);
   $("#terminal-title").textContent = text.terminal;
+  $("#terminal-tab-button").textContent = text.terminalTab;
+  $("#terminal-tab-button").setAttribute("aria-label", text.terminalTabAria);
+  $("#terminal-tab-button").title = text.terminalTabAria;
+  const terminalUrl = new URL(window.location.href);
+  terminalUrl.searchParams.set("view", "terminal");
+  $("#terminal-tab-button").href = terminalUrl.toString();
+  $("#open-workshop-link").textContent = text.openWorkshop;
   $("#docker-playground-button").textContent = text.dockerPlayground;
   $("#docker-dialog-title").textContent = text.dockerTitle;
   $("#docker-dialog-kicker").textContent = text.dockerKicker;
@@ -1074,6 +1164,10 @@ function applyLanguage() {
   $("#docker-dialog-done").textContent = text.dockerClose;
   $("#docker-dialog-close").setAttribute("aria-label", text.dockerCloseAria);
   $("#help-button").textContent = text.help;
+  $("#editor-save").textContent = text.editorSave;
+  $("#editor-close").textContent = text.editorClose;
+  $("#editor-content").setAttribute("aria-label", text.editorAria);
+  $("#editor-frame").setAttribute("aria-label", text.editorAria);
   $("#hint-button").textContent = text.hintButton;
   $("#progress-button").textContent = text.progressButton;
   $("#terminal-output").setAttribute("aria-label", text.terminalAria);
@@ -1091,6 +1185,7 @@ function applyLanguage() {
 
 async function loadLesson(index, options = {}) {
   if (!sessionId) return;
+  if (!closeEditor()) return;
   lessonIndex = index;
   hintStep = 0;
   $("#next-lesson").dataset.announced = "";
@@ -1124,6 +1219,7 @@ async function loadLesson(index, options = {}) {
 
 async function resetCourse() {
   if (!sessionId || commandBusy) return;
+  if (!closeEditor()) return;
   const input = $("#command-input");
   input.disabled = true;
   $("#verify-button").disabled = true;
@@ -1225,6 +1321,20 @@ $("#command-input").addEventListener("keydown", (event) => {
 
 $("#command-input").addEventListener("input", () => {
   lastTabCompletion = null;
+});
+$("#editor-save").addEventListener("click", saveEditorFile);
+$("#editor-close").addEventListener("click", closeEditor);
+$("#editor-content").addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    saveEditorFile();
+  } else if (event.key === "Tab") {
+    event.preventDefault();
+    const input = event.currentTarget;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.setRangeText("  ", start, end, "end");
+  }
 });
 
 $("#reset-button").addEventListener("click", () => loadLesson(lessonIndex));

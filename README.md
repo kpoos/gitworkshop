@@ -42,7 +42,9 @@ Seeded lesson commits are tagged with their exercise ids (`C0`, `C1`, …), whic
 
 The terminal header has two extra controls. **Check task** re-runs the server-side verification on demand: it reports the evidence (real repository state plus the number of real `git` commands executed since the lesson loaded), marks the current exercise complete when it passes, and on the next press advances to the next task. **Hint** reveals the current exercise step by step in the terminal — first the goal, then the tip, and finally the exact commands to run in the container.
 
-The terminal runs commands through Bash and shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around. Home-directory expansion such as `~/file.txt`, variables, quoting, globs, pipes, redirects, command substitution, and normal command chaining work as in a shell. The shell's working directory, variables, functions, and aliases persist between commands in a session. All commands run inside the Docker container.
+The terminal runs commands through Bash and shows a real shell prompt in the `learner@git-workshop:~/repo$` form, following the session's working directory as you `cd` around. Home-directory expansion such as `~/file.txt`, variables, quoting, globs, pipes, redirects, command substitution, and normal command chaining work as in a shell. The shell's working directory, variables, functions, and aliases persist between commands in a session. `vi <file>` (or `vim <file>`) opens that repository file in the integrated editor; saving writes the file in the container-backed working tree. All commands run inside the Docker container.
+
+Use **Open in new tab** in the terminal controls to open a terminal-focused view with more room; it reconnects to the same saved workshop session. The **Full workshop** link returns to the lesson and graph layout.
 
 Press `Tab` to complete common commands, file and directory names, and Git branches; press `Tab` again to list multiple matches.
 
