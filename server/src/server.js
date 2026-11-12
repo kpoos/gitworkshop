@@ -610,6 +610,19 @@ async function seed(session, lesson, language, { resetRepository = false } = {})
     const { remote, remoteUrl } = lesson.scenario;
     // Add the remote
     await runGit(session, ["remote", "add", remote, remoteUrl], { cwd: session.repoDir });
+  } else if (lesson.scenario?.type === "amend") {
+    const { file, base, amendContent } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    // Ensure directory exists
+    await fsp.mkdir(path.dirname(scenarioPath), { recursive: true });
+    // Create a commit with wrong message
+    await fsp.writeFile(scenarioPath, base);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["commit", "-m", "Wrong commit"], { cwd: session.repoDir, env: identityEnv() });
+    // Write the amend content to the file (simulating staged changes)
+    await fsp.writeFile(scenarioPath, amendContent);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
   }
 
   // Tag every seeded commit with its lesson id so commands like

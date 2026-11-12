@@ -614,6 +614,41 @@ const extraPractice = [
     ["Újabb kis változtatás", "Another small change", "Űrlap ellenőrzése", "Validate the form"],
     ["Refaktor commit", "A refactoring commit", "Függvény egyszerűsítve", "Simplify function"],
   ].map(([title, enTitle, message, enMessage]) => practiceCommit(title, enTitle, message, enMessage, 2)),
+  // Amend lesson - after commit practice
+  {
+    type: "exercise",
+    content: {
+      hu: {
+        title: "Commit javítása (amend)", category: "COMMIT · 08",
+        description: "A `git commit --amend` lehetővé teszi az utolsó commit módosítását anélkül, hogy új commitot hoznál létre. Két gyakori használat:\n\n• `git commit --amend -m \"új üzenet\"` – cseréli az utolsó commit üzenetét.\n• `git commit --amend --no-edit` – hozzáadja a staged változtatásokat az utolsó commithoz anélkül, hogy megváltoztatná az üzenetet.\n\nFontos: az amend **új commitot hoz létre** (más SHA-val), ezért csak lokális, még nem pusholt commiteknél használd!\n\nEbben a feladatban van egy commit hibás üzenettel. Javítsd ki az üzenetet, majd add hozzá a hiányzó fájlt.",
+        goal: "Javítsd az utolsó commit üzenetét `git commit --amend -m \"Javított üzenet\"` paranccsal, majd add hozzá a `notes.txt` fájlt `git commit --amend --no-edit` paranccsal.",
+        hint: "1. `git log --oneline -1` – nézd meg az aktuális üzenetet. 2. `git commit --amend -m \"Javított üzenet\"` – cseréli az üzenetet. 3. `git add notes.txt` – stage-eled a fájlt. 4. `git commit --amend --no-edit` – hozzáadod a fájlt az utolsó commithoz anélkül, hogy megváltoztatnád az üzenetet.",
+      },
+      en: {
+        title: "Fix a commit (amend)", category: "COMMIT · 08",
+        description: "`git commit --amend` lets you modify the last commit without creating a new one. Two common uses:\n\n• `git commit --amend -m \"new message\"` – replaces the last commit's message.\n• `git commit --amend --no-edit` – adds staged changes to the last commit without changing its message.\n\nImportant: amend creates a **new commit** (different SHA), so only use it on local, unpushed commits!\n\nThis task has a commit with a wrong message. Fix the message, then add the missing file.",
+        goal: "Fix the last commit's message with `git commit --amend -m \"Fixed message\"`, then add the `notes.txt` file with `git commit --amend --no-edit`.",
+        hint: "1. `git log --oneline -1` – see the current message. 2. `git commit --amend -m \"Fixed message\"` – replaces the message. 3. `git add notes.txt` – stage the file. 4. `git commit --amend --no-edit` – adds the file to the last commit without changing the message.",
+      },
+    },
+    initial: [
+      { id: "C0", parents: [], message: { hu: "Projekt indul", en: "Project starts" }, lane: 0 },
+      { id: "C1", parents: ["C0"], message: { hu: "Hibás commit", en: "Wrong commit" }, lane: 0 },
+    ],
+    branches: { main: "C1" },
+    current: "main",
+    scenario: {
+      type: "amend",
+      file: "notes.txt",
+      base: "Initial content\n",
+      amendContent: "Additional content for amend\n",
+    },
+    check: (s) => {
+      const head = s.commits.find((c) => c.id === s.branches.main);
+      return head && head.message === "Fixed message" && s.files?.["notes.txt"] === "Additional content for amend\n";
+    },
+    solution: ["git commit --amend -m \"Fixed message\"", "git add notes.txt", "git commit --amend --no-edit"],
+  },
   // Stash lessons - after commit practice
   {
     type: "exercise",
