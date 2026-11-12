@@ -47,7 +47,7 @@ const COMMAND_COMPLETIONS = new Set([
   "git", "ls", "pwd", "cat", "echo", "mkdir", "rmdir", "touch", "rm", "cp", "mv",
   "head", "tail", "wc", "grep", "tree", "find", "date", "whoami", "uname", "env",
   "printenv", "stat", "du", "df", "sort", "uniq", "basename", "dirname", "which",
-  "true", "false", "test", "vi", "vim",
+  "true", "false", "test", "stash",
 ]);
 
 const sessions = new Map();
@@ -554,6 +554,62 @@ async function seed(session, lesson, language, { resetRepository = false } = {})
     const scenarioPath = path.resolve(session.repoDir, file);
     if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
     await fsp.writeFile(scenarioPath, dirtyContent);
+  } else if (lesson.scenario?.type === "stash-basic") {
+    const { file, base, workInProgress } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    // Ensure directory exists
+    await fsp.mkdir(path.dirname(scenarioPath), { recursive: true });
+    // Write the work-in-progress content to simulate uncommitted changes
+    await fsp.writeFile(scenarioPath, workInProgress);
+  } else if (lesson.scenario?.type === "stash-multi") {
+    const { file, base, stash1, stash2 } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    // Ensure directory exists
+    await fsp.mkdir(path.dirname(scenarioPath), { recursive: true });
+    // Create two stashes by committing and stashing
+    await fsp.writeFile(scenarioPath, base);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["commit", "-m", "Base version"], { cwd: session.repoDir, env: identityEnv() });
+
+    await fsp.writeFile(scenarioPath, stash1);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["stash", "push", "-m", "stash1"], { cwd: session.repoDir });
+
+    await fsp.writeFile(scenarioPath, stash2);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["stash", "push", "-m", "stash2"], { cwd: session.repoDir });
+
+    // Restore base version
+    await fsp.writeFile(scenarioPath, base);
+  } else if (lesson.scenario?.type === "stash-branch") {
+    const { file, base, stashContent } = lesson.scenario;
+    const scenarioPath = path.resolve(session.repoDir, file);
+    if (!isInside(session.repoDir, scenarioPath)) throw new Error(`Invalid scenario file path: ${file}`);
+    // Ensure directory exists
+    await fsp.mkdir(path.dirname(scenarioPath), { recursive: true });
+    // Create a stash that would conflict with current HEAD
+    await fsp.writeFile(scenarioPath, base);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["commit", "-m", "Base config"], { cwd: session.repoDir, env: identityEnv() });
+
+    // Make another commit on main
+    await fsp.writeFile(scenarioPath, "export const config = { mode: 'stable', updated: true };\n");
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["commit", "-m", "Update config"], { cwd: session.repoDir, env: identityEnv() });
+
+    // Now create the stash with conflicting content
+    await fsp.writeFile(scenarioPath, stashContent);
+    await runGit(session, ["add", file], { cwd: session.repoDir });
+    await runGit(session, ["stash", "push", "-m", "feature config"], { cwd: session.repoDir });
+
+    // Restore base version
+    await fsp.writeFile(scenarioPath, base);
+  } else if (lesson.scenario?.type === "push") {
+    const { remote, remoteUrl } = lesson.scenario;
+    // Add the remote
+    await runGit(session, ["remote", "add", remote, remoteUrl], { cwd: session.repoDir });
   }
 
   // Tag every seeded commit with its lesson id so commands like
@@ -692,35 +748,6 @@ async function buildState(session) {
       if (!meta.idMap[sha]) meta.idMap[sha] = `C${meta.nextId++}`;
       branches[name] = meta.idMap[sha];
       branchTips[name] = meta.idMap[sha];
-    }
-  }
-
-  const taskRoots = new Set(meta.stageRootShas || []);
-  if (taskRoots.size) {
-    const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
-    const activeShas = new Set();
-    const stack = [
-      ...Object.values(branchTips).map((id) => commits.find((commit) => commit.id === id)?.sha),
-    ];
-    const headResult = await runGit(session, ["rev-parse", "-q", "--verify", "HEAD"]);
-    if (headResult.code === 0) stack.push(headResult.stdout.trim());
-
-    while (stack.length) {
-      const sha = stack.pop();
-      if (!sha || activeShas.has(sha)) continue;
-      const commit = commitsBySha.get(sha);
-      if (!commit) continue;
-      activeShas.add(sha);
-      if (taskRoots.has(sha)) continue;
-      stack.push(...(parentsBySha.get(sha) || []));
-    }
-
-    const activeIds = new Set(commits
-      .filter((commit) => activeShas.has(commit.sha))
-      .map((commit) => commit.id));
-    for (let index = commits.length - 1; index >= 0; index -= 1) {
-      if (!activeShas.has(commits[index].sha)) commits.splice(index, 1);
-      else commits[index].parents = commits[index].parents.filter((parent) => activeIds.has(parent));
     }
   }
 
