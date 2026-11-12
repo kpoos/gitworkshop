@@ -694,35 +694,6 @@ async function buildState(session) {
     }
   }
 
-  const taskRoots = new Set(meta.stageRootShas || []);
-  if (taskRoots.size) {
-    const commitsBySha = new Map(commits.map((commit) => [commit.sha, commit]));
-    const activeShas = new Set();
-    const stack = [
-      ...Object.values(branchTips).map((id) => commits.find((commit) => commit.id === id)?.sha),
-    ];
-    const headResult = await runGit(session, ["rev-parse", "-q", "--verify", "HEAD"]);
-    if (headResult.code === 0) stack.push(headResult.stdout.trim());
-
-    while (stack.length) {
-      const sha = stack.pop();
-      if (!sha || activeShas.has(sha)) continue;
-      const commit = commitsBySha.get(sha);
-      if (!commit) continue;
-      activeShas.add(sha);
-      if (taskRoots.has(sha)) continue;
-      stack.push(...(parentsBySha.get(sha) || []));
-    }
-
-    const activeIds = new Set(commits
-      .filter((commit) => activeShas.has(commit.sha))
-      .map((commit) => commit.id));
-    for (let index = commits.length - 1; index >= 0; index -= 1) {
-      if (!activeShas.has(commits[index].sha)) commits.splice(index, 1);
-      else commits[index].parents = commits[index].parents.filter((parent) => activeIds.has(parent));
-    }
-  }
-
   let current = null;
   let detached = null;
   const symbolic = await runGit(session, ["symbolic-ref", "-q", "--short", "HEAD"]);
